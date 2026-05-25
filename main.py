@@ -20,6 +20,16 @@ class CTLog:
 
 
 
+class CTCluster():
+    def __init__(self, domain, issuer, first_seen, last_seen, sightings=1):
+        self.domain = domains
+        self.issuer = issuer
+        self.first_seen = first_seen
+        self.last_seen = last_seen
+        self.sightings = sightings
+
+
+
 class rawIPs:
     def __init__(self, domain, IPs):
         self.domain = domain
@@ -120,9 +130,7 @@ def normalise_cert_spotter(data):
             asn = query.get('dns_names')
             issuer = (query.get("issuer").get("friendly_name"))
 
-            print(query)
-
-            log = CTLog(asn, issuer, cert.get('not_after'), cert.get('not_before'))
+            log = CTLog(asn, issuer, query.get('not_after'), query.get('not_before'))
             ct_logs.add(log)
 
     return ct_logs
@@ -132,7 +140,16 @@ def normalise_crt_sh(data):
     for result in data:
         for cert in result:
             asn = cert.get('name_value')
-            issuer = cert.get('issuer_name')
+            temp_issuer = cert.get('issuer_name')
+
+            try:
+                issuer = next(
+                    b.split("=", 1)[1].strip().strip('"')
+                    for b in temp_issuer.split(",") 
+                    if b.strip().startswith("O=")
+                )
+            except:
+                issuer = ""
 
             log = CTLog(asn.split("\n"), issuer, cert.get('not_after'), cert.get('not_before'))
             ct_logs.add(log)
@@ -163,6 +180,41 @@ def normalise_vt(data):
     return IP_OUTPUT, SUBDOMAIN_OUTPUT
 
 # ----------------------------
+# Aggregation Layer
+# ----------------------------
+def aggregate_ct_logs(ct_logs):
+    clusters = {}
+
+    for log in ct_logs:
+        key = (tuple(sorted(set(log.domains))), log.issuer)
+
+        if key not in clusters:
+            clusters[key] = {
+                "domains": (tuple(sorted(set(log.domains)))),
+                "issuer": log.issuer,
+                "first_seen": log.first_date,
+                "last_seen": log.last_date,
+                "sightings": 1
+            }
+
+        else:
+            cluster = clusters[key]
+            cluster["sightings"] += 1
+        
+        cluster = clusters[key]
+        if log.first_date and (cluster['first_seen'] is None or log.first_date < cluster["first_seen"]):
+            cluster["first_seen"] = log.first_date
+
+        if log.last_date and (cluster['last_seen'] is None or log.last_date < cluster["last_seen"]):
+            cluster["last_seen"] = log.last_date
+            
+    return sorted(
+        clusters.values(),
+        key=lambda c: c["first_seen"],
+        reverse=true
+    )
+
+# ----------------------------
 # Main Pipeline
 # ----------------------------
 
@@ -182,7 +234,7 @@ def __main__():
     normal_cert_spotter = normalise_cert_spotter(cert_spotter_results)
     ips, subdomains = normalise_vt(vt_results)
     
-    ct_logs_deduplicated = normal_crt_sh | normal_cert_spotter
+    ct_logs_deduplicated = aggregate_ct_logs(normal_crt_sh | normal_cert_spotter)
 
     print(f"-- CT LOG OUTPUT --\n\n{ct_logs_deduplicated}")
     print(f"-- VT OUTPUT --\n\n{ips}\n\n{subdomains}")
