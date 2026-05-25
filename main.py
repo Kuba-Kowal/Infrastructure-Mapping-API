@@ -1,172 +1,190 @@
 import requests
 import json
 import time
+import os
+from dotenv import load_dotenv
 
+# ----------------------------
+# Data models
+# ----------------------------
 
-
-# Original request logs
-class RawCTLog:
-    def __init__(self, asn, date, issuer):
-        self.asn = asn
-        self.date = date
+class CTLog:
+    def __init__(self, domains, issuer, first_date, last_date):
+        self.domains = tuple(domains)
         self.issuer = issuer
-    
-    def __repr__(self):
-        return f"Domain(asn={self.asn}, date={self.date}, issuer={self.issuer})"
-
-# Cleaned up logs
-class CTLog():
-    def __init__(self, asn, issuer, first_date, last_date):
-        self.asn = asn
         self.first_date = first_date
         self.last_date = last_date
-        self.issuer = issuer
-    
+
     def __repr__(self):
-        return (f"""{[asn for asn in self.asn]}
-issuer={self.issuer.strip('"')} 
-[{self.first_date},{self.last_date}]""")
+        return f"{self.domains} | {self.issuer} | [{self.first_date} → {self.last_date}]"
 
 
 
-# Extract issuer name
-def clean_issuer_name(issuer):
-    for i in issuer.split(','):
-        i = i.strip()
-        if i.startswith('O='):
-            return i.replace("O=", "")
-        else:
-            return "Unkown"
+class rawIPs:
+    def __init__(self, domain, IPs):
+        self.domain = domain
+        self.IPs = IPs
 
-# Remove time from DateTime
-def clean_date(date):
-    date = date.split("T")
-    return date[0]
+    def __repr__(self):
+        return f"DOMAIN: {domain} | IPs: {IPs}"
 
-# Remove duplicate logs and sort by date added to repository descending
-def dedup_request(logs: list):
-    groups = {}
-    new_queries = []
+# ----------------------------
+# Networking layer
+# ----------------------------
 
-    # Create a dictionary of asn, issuer -> timestamp mappings
-    for log in logs:
-        key = (tuple(log.asn), log.issuer)
+def fetch_crt_sh(domain):
+    MAX_RETRIES = 20
+    RATE_LIMIT = 0.5
 
-        if key not in groups:
-            groups[key] = []
+    url = f"https://crt.sh/?q={domain}&output=json"
 
-        groups[key].append(log.date)
+    print("[+] QUERY CRT.SH")
 
-    cleaned_logs = []
-
-    # For every combination of asn <-> issuer. Any domains that are new, add them to the queue list. 
-    for (asn, issuer), dates in groups.items():
-        for domain in asn:
-            domain = domain.strip(",() ")
-            if domain in new_queries:
-                continue
-            new_queries.append(domain)
-
-        # Create new object for duplicate ASNs including latest log and oldest log date.
-        cleaned_logs.append(
-            CTLog(asn, issuer, max(dates), min(dates))
-        )
-
-    cleaned_logs.sort(key=lambda x: x.first_date, reverse=True)
-
-    return cleaned_logs, new_queries
-
-# Make crt.sh request in json format
-def make_crt_req(DOMAIN_NAME, RATE_LIMIT, MAX_RETRIES):
-    session = requests.Session()
-
-    session.headers.update({"User-Agent": "Mozilla/5.0"})
-
-    url = f"https://crt.sh/?q={DOMAIN_NAME}&output=json"
-
-    print(f"[+] CRT.SH QUERY -> {DOMAIN_NAME}")
-
-    # Attempt connection to server
-    for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            response = session.get(url, timeout=60)
-
-            if response.status_code == 200:
-                print("[+] SUCCESS")
-                break
-
-            else:
-                pass
-
-        except requests.exceptions.RequestException as e:
-            print(f"[-] Request failed: {e}")
-
+    for i in range (MAX_RETRIES):
         time.sleep(RATE_LIMIT)
 
-    else:
-        print("[-] Failed after max retries")
-
-        return None
-
-
-    # Convert crt.sh data into objects
-    raw_ct_log_list = []
-    for item in response.json():
-        if not item.get("entry_timestamp"):
+        try:
+            req = requests.get(url, timeout=60)
+        except Exception as e:
+            print(e)
             continue
 
-        domain = RawCTLog(
-            item['name_value'].split(),
-            clean_date(item['entry_timestamp']),
-            clean_issuer_name(item['issuer_name'])
-            )
+        if req.status_code == 200:
+            print("[+] SUCCESS")
+            return req.json()
 
-        raw_ct_log_list.append(domain)
+    print("[-] FAILED")
+    return None
 
-    return raw_ct_log_list
+def fetch_cert_spotter(domain):
+    API_KEY = os.getenv("CERT_SPOTTER_API")
+    RATE_LIMIT = 2
+    MAX_RETRIES = 5
 
-def __main__(DOMAIN_NAME):
-    RATE_LIMIT = 0.5
-    MAX_RETRIES = 20
+    headers = {
+        "Authorization": f"Bearer {API_KEY}"
+    }
 
-    queue = set()
-    searched_queries = set()
-    output = []
+    url = f"https://api.certspotter.com/v1/issuances?domain={domain}&include_subdomains=true&expand=dns_names&expand=issuer"
 
-    queue.add(DOMAIN_NAME)
-    while len(queue) != 0:
-        # Take object out of queue
-        current_query = queue.pop()
-        searched_queries.add(current_query)
+    print("[+] QUERY CERT SPOTTER")
 
-        # Make request with latest item removed from queue
-        request_output = make_crt_req(current_query, RATE_LIMIT, MAX_RETRIES)
-        if request_output == None:
+    for i in range(MAX_RETRIES):
+        time.sleep(RATE_LIMIT)
+
+        try:
+            req = requests.get(url, headers=headers, timeout=20)
+        except Exception as e:
+            print(e)
             continue
-        
-        # Dedupliacte, organise and append new queries 
-        clean_logs, new_queries = dedup_request(request_output)
 
-        for log in clean_logs:
-            output.append(log)
+        if req.status_code == 200:
+            print("[+] SUCCESS")
+            return req.json()
 
-        # Add new queries to queue
-        if len(new_queries) > 0:
-            for query in new_queries:
-                if query in searched_queries:
-                    continue
-                queue.add(query)
+    print("[-] FAILED")
+    return None
 
-    print("\n[+] Queue Finished")
-    time.sleep(3)
+def fetch_vt_crt(domain):
+    API_KEY = os.getenv("VT_API_KEY")
+    RATE_LIMIT = 3
+    MAX_RETRIES = 3
 
-    return output
+    url = f"https://www.virustotal.com/vtapi/v2/domain/report?apikey={API_KEY}&domain={domain}"
 
-DOMAIN_NAME = "example.com"
-output = __main__(DOMAIN_NAME)
+    print("[+] QUERY VIRUSTOTAL")
 
-# Print logs
-for result in output:
-    print(result)
-    print(type(result.asn))
+    for i in range(MAX_RETRIES):
+        time.sleep(RATE_LIMIT)
+        try:
+            req = requests.get(url, timeout=20)
+        except Exception as e:
+            print(e)
+            continue
 
+        if req.status_code == 200:
+            print("[+] SUCCESS")
+            return {domain: req.json()}
+
+    print("[-] FAILED")
+    return None
+
+# ----------------------------
+# Normalisation layer
+# ----------------------------
+
+def normalise_cert_spotter(data):
+    ct_logs = set()
+    for result in data:
+        for query in result:
+            asn = query.get('dns_names')
+            issuer = (query.get("issuer").get("friendly_name"))
+
+            print(query)
+
+            log = CTLog(asn, issuer, cert.get('not_after'), cert.get('not_before'))
+            ct_logs.add(log)
+
+    return ct_logs
+
+def normalise_crt_sh(data):
+    ct_logs = set()
+    for result in data:
+        for cert in result:
+            asn = cert.get('name_value')
+            issuer = cert.get('issuer_name')
+
+            log = CTLog(asn.split("\n"), issuer, cert.get('not_after'), cert.get('not_before'))
+            ct_logs.add(log)
+
+    return ct_logs
+
+def normalise_vt(data):
+    IP_OUTPUT = []
+    SUBDOMAIN_OUTPUT = set()
+
+    for query in data:
+        for domain, values in query.items():
+            if type(query) != dict:
+                continue
+
+            for res in values.get("resolutions", []):
+                ip = res.get("ip_address")
+
+                IP_OUTPUT.append({
+                    "domain": domain,
+                    "ip": ip,
+                    "source": "VT"
+                })
+
+            for subdomain in values.get("subdomains", []):
+                SUBDOMAIN_OUTPUT.add(subdomain)
+
+    return IP_OUTPUT, SUBDOMAIN_OUTPUT
+
+# ----------------------------
+# Main Pipeline
+# ----------------------------
+
+def __main__():
+    load_dotenv()
+    TARGET_DOMAIN = "example.com"
+
+    vt_results = []
+    crt_sh_results = []
+    cert_spotter_results = []
+
+    crt_sh_results.append(fetch_crt_sh(TARGET_DOMAIN))
+    cert_spotter_results.append(fetch_cert_spotter(TARGET_DOMAIN))
+    vt_results.append(fetch_vt_crt(TARGET_DOMAIN))
+
+    normal_crt_sh = normalise_crt_sh(crt_sh_results)
+    normal_cert_spotter = normalise_cert_spotter(cert_spotter_results)
+    ips, subdomains = normalise_vt(vt_results)
+    
+    ct_logs_deduplicated = normal_crt_sh | normal_cert_spotter
+
+    print(f"-- CT LOG OUTPUT --\n\n{ct_logs_deduplicated}")
+    print(f"-- VT OUTPUT --\n\n{ips}\n\n{subdomains}")
+
+__main__()
