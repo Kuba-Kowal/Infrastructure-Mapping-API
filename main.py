@@ -400,17 +400,19 @@ def process_vt_data(vt_data):
 
 def main(TARGET_DOMAIN):
     load_dotenv()
-    vt_data = vt_fetch_pipeline("TARGET_DOMAIN")
-    crt_sh_data, cert_spotter_data = ct_log_fetch_pipeline("TARGET_DOMAIN")
+    vt_data = vt_fetch_pipeline(TARGET_DOMAIN)
+    crt_sh_data, cert_spotter_data = ct_log_fetch_pipeline(TARGET_DOMAIN)
 
     crt_sh_certificates, crt_sh_FQDNs, crt_sh_relationships = process_crt_sh_log_data(crt_sh_data)
     cert_spotter_certificates, cert_spotter_FQDNs, cert_spotter_relationships = process_cert_spotter_data(cert_spotter_data)
-    vt_FQDNs, vt_IPs = process_vt_data(vt_data)
+    vt_FQDNs, vt_IPs, vt_relationships = process_vt_data(vt_data)
 
     print("\n\n\n VT - IPs \n\n")
     print(vt_IPs)
     print("\n\n\n VT - FQDNs \n\n")
     print(vt_FQDNs)
+    print("\n\n\n VT - Relationships \n\n")
+    print(vt_relationships)
 
     print("\n\n\n CRT.SH - Certificates \n\n")
     print(crt_sh_certificates)
