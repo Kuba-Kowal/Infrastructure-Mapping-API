@@ -3,40 +3,95 @@ import json
 import time
 import os
 from dotenv import load_dotenv
+from dataclasses import dataclass
+from datetime import date
 
 # ----------------------------
-# Data models
+# Data models - Raw
+# ----------------------------
+@dataclass
+class Queue:
+    queue:list
+    seen:set
+
+    def next_item_in_queue(self):
+        next_item = self.queue.pop(0)
+        self.seen.add(next_item)
+
+        return next_item
+
+    def add_to_queue(self, domains):
+        for domain in domains:
+            if domain in self.seen or domain in self.queue:
+                continue
+            self.queue.append(domain)
+
+        return None
+
+
+@dataclass(frozen=True, slots=True)
+class Certificate:
+    id:str
+    issuer:str
+    not_before:date
+    not_after:date
+
+@dataclass(frozen=True, slots=True)
+class FQDN:
+    domain:str
+
+@dataclass(frozen=True, slots=True)
+class IPAddress:
+    ip:str
+
+@dataclass(frozen=True, slots=True)
+class DNSRecord:
+    record_type:str
+    record:dict
+
+@dataclass(frozen=True, slots=True)
+class ASN:
+    as_number:int
+    as_name:str
+
+@dataclass(frozen=True, slots=True)
+class Prefix:
+    prefix:str
+
+# ----------------------------
+# Data models - Relational
 # ----------------------------
 
-class CTLog:
-    def __init__(self, domains, issuer, first_date, last_date):
-        self.domains = tuple(domains)
-        self.issuer = issuer
-        self.first_date = first_date
-        self.last_date = last_date
+@dataclass(frozen=True, slots=True)
+class CerttoFQDN:
+    certificate:Certificate
+    fqdn:FQDN
+    observed_at:str
 
-    def __repr__(self):
-        return f"{self.domains} | {self.issuer} | [{self.first_date} → {self.last_date}]"
+@dataclass(frozen=True, slots=True)
+class IPtoPrefix:
+    ip:IPAddress
+    prefix:Prefix
+    observed_at:str
 
+@dataclass(frozen=True, slots=True)
+class PrefixtoASN:
+    prefix:Prefix
+    asn:ASN
+    observed_at:str
 
+@dataclass(frozen=True, slots=True)
+class FQDNtoDNS:
+    fqdn:FQDN
+    dns_record:DNSRecord
+    observed_at:str
 
-class CTCluster():
-    def __init__(self, domain, issuer, first_seen, last_seen, sightings=1):
-        self.domain = domains
-        self.issuer = issuer
-        self.first_seen = first_seen
-        self.last_seen = last_seen
-        self.sightings = sightings
-
-
-
-class rawIPs:
-    def __init__(self, domain, IPs):
-        self.domain = domain
-        self.IPs = IPs
-
-    def __repr__(self):
-        return f"DOMAIN: {domain} | IPs: {IPs}"
+@dataclass(frozen=True, slots=True)
+class FQDNtoPassiveDNS:
+    fqdn:FQDN
+    ip:IPAddress
+    last_observed:date
+    source:str
 
 # ----------------------------
 # Networking layer
@@ -48,7 +103,7 @@ def fetch_crt_sh(domain):
 
     url = f"https://crt.sh/?q={domain}&output=json"
 
-    print("[+] QUERY CRT.SH")
+    print(f"[⋆] QUERY CRT.SH | {domain}")
 
     for i in range (MAX_RETRIES):
         time.sleep(RATE_LIMIT)
@@ -61,10 +116,20 @@ def fetch_crt_sh(domain):
 
         if req.status_code == 200:
             print("[+] SUCCESS")
-            return req.json()
 
-    print("[-] FAILED")
-    return None
+            data = req.json()
+            all_domains = set()
+            for certificate in data:
+                new_domains = certificate["name_value"].split("\n")
+                for domain in new_domains:
+                    if domain.startswith("*"):
+                        continue
+                    all_domains.add(domain)
+
+            return data, all_domains
+
+    print("[-] FAILED - MAX RETRIES")
+    return dict(), list()
 
 def fetch_cert_spotter(domain):
     API_KEY = os.getenv("CERT_SPOTTER_API")
@@ -77,7 +142,7 @@ def fetch_cert_spotter(domain):
 
     url = f"https://api.certspotter.com/v1/issuances?domain={domain}&include_subdomains=true&expand=dns_names&expand=issuer"
 
-    print("[+] QUERY CERT SPOTTER")
+    print(f"[⋆] QUERY CERT SPOTTER | {domain}")
 
     for i in range(MAX_RETRIES):
         time.sleep(RATE_LIMIT)
@@ -90,19 +155,29 @@ def fetch_cert_spotter(domain):
 
         if req.status_code == 200:
             print("[+] SUCCESS")
-            return req.json()
 
-    print("[-] FAILED")
-    return None
+            data = req.json()
+            all_domains = set()
+            for certificate in data:
+                new_domains = certificate["dns_names"]
+                for domain in new_domains:
+                    if domain.startswith("*"):
+                        continue
+                    all_domains.add(domain)
 
-def fetch_vt_crt(domain):
+            return data, all_domains
+
+    print("[-] FAILED - MAX RETRIES")
+    return dict(), list()
+
+def fetch_vt(domain):
     API_KEY = os.getenv("VT_API_KEY")
     RATE_LIMIT = 3
     MAX_RETRIES = 3
 
     url = f"https://www.virustotal.com/vtapi/v2/domain/report?apikey={API_KEY}&domain={domain}"
 
-    print("[+] QUERY VIRUSTOTAL")
+    print(f"[⋆] QUERY VIRUSTOTAL | {domain}")
 
     for i in range(MAX_RETRIES):
         time.sleep(RATE_LIMIT)
@@ -114,129 +189,241 @@ def fetch_vt_crt(domain):
 
         if req.status_code == 200:
             print("[+] SUCCESS")
-            return {domain: req.json()}
+            data = req.json()
+            new_subdomains = []
 
-    print("[-] FAILED")
-    return None
+            if data.get('subdomains') is not None:
+                for inner_domain in data['subdomains']:
+                    if inner_domain in new_subdomains:
+                        continue
+                    new_subdomains.append(inner_domain)
 
-# ----------------------------
-# Normalisation layer
-# ----------------------------
+            return {domain: data}, new_subdomains
 
-def normalise_cert_spotter(data):
-    ct_logs = set()
-    for result in data:
-        for query in result:
-            asn = query.get('dns_names')
-            issuer = (query.get("issuer").get("friendly_name"))
-
-            log = CTLog(asn, issuer, query.get('not_after'), query.get('not_before'))
-            ct_logs.add(log)
-
-    return ct_logs
-
-def normalise_crt_sh(data):
-    ct_logs = set()
-    for result in data:
-        for cert in result:
-            asn = cert.get('name_value')
-            temp_issuer = cert.get('issuer_name')
-
-            try:
-                issuer = next(
-                    b.split("=", 1)[1].strip().strip('"')
-                    for b in temp_issuer.split(",") 
-                    if b.strip().startswith("O=")
-                )
-            except:
-                issuer = ""
-
-            log = CTLog(asn.split("\n"), issuer, cert.get('not_after'), cert.get('not_before'))
-            ct_logs.add(log)
-
-    return ct_logs
-
-def normalise_vt(data):
-    IP_OUTPUT = []
-    SUBDOMAIN_OUTPUT = set()
-
-    for query in data:
-        for domain, values in query.items():
-            if type(query) != dict:
-                continue
-
-            for res in values.get("resolutions", []):
-                ip = res.get("ip_address")
-
-                IP_OUTPUT.append({
-                    "domain": domain,
-                    "ip": ip,
-                    "source": "VT"
-                })
-
-            for subdomain in values.get("subdomains", []):
-                SUBDOMAIN_OUTPUT.add(subdomain)
-
-    return IP_OUTPUT, SUBDOMAIN_OUTPUT
+    print("[-] FAILED - MAX RETRIES")
+    return {domain: "FAILED"}, []
 
 # ----------------------------
-# Aggregation Layer
-# ----------------------------
-def aggregate_ct_logs(ct_logs):
-    clusters = {}
-
-    for log in ct_logs:
-        key = (tuple(sorted(set(log.domains))), log.issuer)
-
-        if key not in clusters:
-            clusters[key] = {
-                "domains": (tuple(sorted(set(log.domains)))),
-                "issuer": log.issuer,
-                "first_seen": log.first_date,
-                "last_seen": log.last_date,
-                "sightings": 1
-            }
-
-        else:
-            cluster = clusters[key]
-            cluster["sightings"] += 1
-        
-        cluster = clusters[key]
-        if log.first_date and (cluster['first_seen'] is None or log.first_date < cluster["first_seen"]):
-            cluster["first_seen"] = log.first_date
-
-        if log.last_date and (cluster['last_seen'] is None or log.last_date < cluster["last_seen"]):
-            cluster["last_seen"] = log.last_date
-            
-    return sorted(
-        clusters.values(),
-        key=lambda c: c["first_seen"],
-        reverse=true
-    )
-
-# ----------------------------
-# Main Pipeline
+# Data Collection Layer
 # ----------------------------
 
-def __main__():
-    load_dotenv()
-    TARGET_DOMAIN = "example.com"
-
-    vt_results = []
+def ct_log_fetch_pipeline(TARGET_DOMAIN):
     crt_sh_results = []
+    crt_sh_seen_ids = set()
+
     cert_spotter_results = []
-
-    crt_sh_results.append(fetch_crt_sh(TARGET_DOMAIN))
-    cert_spotter_results.append(fetch_cert_spotter(TARGET_DOMAIN))
-    vt_results.append(fetch_vt_crt(TARGET_DOMAIN))
-
-    normal_crt_sh = normalise_crt_sh(crt_sh_results)
-    normal_cert_spotter = normalise_cert_spotter(cert_spotter_results)
-    ips, subdomains = normalise_vt(vt_results)
+    cert_spotter_seen_ids = set()
     
-    ct_logs_deduplicated = aggregate_ct_logs(normal_crt_sh | normal_cert_spotter)
 
-    print(f"-- CT LOG OUTPUT --\n\n{ct_logs_deduplicated}")
-    print(f"-- VT OUTPUT --\n\n{ips}\n\n{subdomains}")
+    queue = Queue([TARGET_DOMAIN], set())
 
-__main__()
+    while len(queue.queue) > 0:
+        next_domain = queue.next_item_in_queue()
+
+        crt_sh_data, crt_sh_new_domains = fetch_crt_sh(next_domain)
+        for certificate in crt_sh_data:
+            if certificate['id'] not in crt_sh_seen_ids:
+                crt_sh_seen_ids.add(certificate['id'])
+                crt_sh_results.append(certificate)
+
+        cert_spotter_data, cert_spotter_new_domains = fetch_cert_spotter(next_domain)
+        for certificate in cert_spotter_data:
+            if certificate['id'] not in cert_spotter_seen_ids:
+                cert_spotter_seen_ids.add(certificate['id'])
+                cert_spotter_results.append(certificate)
+
+        queue.add_to_queue(crt_sh_new_domains)
+        queue.add_to_queue(cert_spotter_new_domains)
+
+    return crt_sh_results, cert_spotter_results
+
+def vt_fetch_pipeline(TARGET_DOMAIN):
+    vt_results = []
+
+    queue = Queue([TARGET_DOMAIN], set())
+
+    while len(queue.queue) > 0:
+        next_domain = queue.next_item_in_queue()
+
+        data, new_domains = fetch_vt(next_domain)
+
+        vt_results.append(data)
+
+        queue.add_to_queue(new_domains)
+
+    return vt_results
+
+# ----------------------------
+# Data Processing Layer (Object Creation)
+# ----------------------------
+def process_crt_sh_log_data(crt_sh_data):
+    certificates = []
+    FQDNs = []
+    relationships = []
+    crt_sh_FQDNs = set()
+
+    for certificate in crt_sh_data:
+        # Extract issuer name
+        if certificate.get('issuer_name') is not None:
+            if "O=" in certificate['issuer_name']:
+                issuer = next(
+                    field.strip().split("=", 1)[1]
+                    for field in certificate['issuer_name'].split(",")
+                    if field.strip().startswith("O=")
+                )
+        else:
+            issuer = "Unknown"
+
+        # Extract not before certificate field
+        if certificate.get('not_before') is not None:
+            date_field = certificate['not_before']
+            not_before = date.fromisoformat(date_field[:10])
+        else:
+            not_before = None
+
+        # Extract not after certificate field
+        if certificate.get('not_after') is not None:
+            date_field = certificate['not_after']
+            not_after = date.fromisoformat(date_field[:10])
+        else:
+            not_after = None
+
+        # Create certificate object utilising these fields
+        cert_object = Certificate(certificate['id'], issuer, not_before, not_after)
+        certificates.append(cert_object)
+
+        # Create FQDN object based on SANs
+        for domain in certificate['name_value'].split('\n'):
+            fqdn_object = FQDN(domain)
+            if domain not in crt_sh_FQDNs:
+                crt_sh_FQDNs.add(domain)
+                FQDNs.append(fqdn_object)
+
+            # Create FQDN <-> Certificate Mapping Object
+            relationships.append(CerttoFQDN(cert_object, fqdn_object, "Observed at Crt.sh"))
+
+    return certificates, FQDNs, relationships
+
+def process_cert_spotter_data(cert_spotter_data):
+    certificates = []
+    FQDNs = []
+    relationships = []
+    cert_spotter_FQDNs = set()
+
+    for certificate in cert_spotter_data:
+        # Extract issuer name
+        if certificate.get('issuer') is not None:
+            if certificate['issuer'].get('friendly_name') is not None:
+                issuer = certificate['issuer']['friendly_name']
+            else:
+                issuer = "Unknown"
+        else:
+            issuer = "Unknown"
+
+        # Extract not before certificate field
+        if certificate.get('not_before') is not None:
+            date_field = certificate['not_before']
+            not_before = date.fromisoformat(date_field[:10])
+        else:
+            not_before = None
+
+        # Extract not after certificate field
+        if certificate.get('not_after') is not None:
+            date_field = certificate['not_after']
+            not_after = date.fromisoformat(date_field[:10])
+        else:
+            not_after = None
+
+        # Create certificate object utilising these fields
+        cert_object = Certificate(certificate['id'], issuer, not_before, not_after)
+        certificates.append(cert_object)
+
+        # Create FQDN object based on SANs
+        if certificate.get('dns_names') is not None:
+            for domain in certificate['dns_names']:
+                fqdn_object = FQDN(domain)
+                if domain not in cert_spotter_FQDNs:
+                    cert_spotter_FQDNs.add(domain)
+                    FQDNs.append(fqdn_object)
+
+                # Create FQDN <-> Certificate Mapping Object
+                relationships.append(CerttoFQDN(cert_object, fqdn_object, "Observed at CertSpotter"))
+
+    return certificates, FQDNs, relationships
+
+def process_vt_data(vt_data):
+    FQDNs = []
+    IPs = []
+    relationships = []
+
+    seen_FQDNs = set()
+
+    # Itterate through dataset
+    for entry in vt_data:
+            for domain, report in entry.items():
+                print(domain)
+                print(report)
+                fqdn_object = FQDN(domain)
+
+                # Create FQDN Objects
+                if domain not in seen_FQDNs:
+                    seen_FQDNs.add(domain)
+                    FQDNs.append(fqdn_object)
+        
+                
+                if type(report) == str:
+                    continue
+
+                # Create IP Objects
+                if report.get('resolutions') is not None:
+                    for ip in report['resolutions']:
+                        if ip.get('ip_address') is not None:
+                            ip_addr = ip['ip_address']
+                        else:
+                            ip_addr = ""
+                        if ip.get('last_resolved') is not None:
+                            last_observed = ip['last_resolved']
+                        else:
+                            last_observed = "unkown"
+
+                        ip_object = IPAddress(ip_addr)
+
+                        if ip_object in IPs:
+                            continue
+                        IPs.append(ip_object)
+
+                        # Create FQDN to pDNS Relationship Object
+                        relationship_object = FQDNtoPassiveDNS(fqdn_object, ip_object, last_observed, "Observed at VirusTotal")
+                        relationships.append(relationship_object)
+
+    return FQDNs, IPs, relationships
+
+def main(TARGET_DOMAIN):
+    load_dotenv()
+    vt_data = vt_fetch_pipeline("TARGET_DOMAIN")
+    crt_sh_data, cert_spotter_data = ct_log_fetch_pipeline("TARGET_DOMAIN")
+
+    crt_sh_certificates, crt_sh_FQDNs, crt_sh_relationships = process_crt_sh_log_data(crt_sh_data)
+    cert_spotter_certificates, cert_spotter_FQDNs, cert_spotter_relationships = process_cert_spotter_data(cert_spotter_data)
+    vt_FQDNs, vt_IPs = process_vt_data(vt_data)
+
+    print("\n\n\n VT - IPs \n\n")
+    print(vt_IPs)
+    print("\n\n\n VT - FQDNs \n\n")
+    print(vt_FQDNs)
+
+    print("\n\n\n CRT.SH - Certificates \n\n")
+    print(crt_sh_certificates)
+    print("\n\n\n CRT.SH - FQDNs \n\n")
+    print(crt_sh_FQDNs)
+    print("\n\n\n CRT.SH - Relationships \n\n")
+    print(crt_sh_relationships)
+
+    print("\n\n\n CertSpotter - Certificates \n\n")
+    print(cert_spotter_certificates)
+    print("\n\n\n CertSpotter- FQDNs \n\n")
+    print(cert_spotter_FQDNs)
+    print("\n\n\n CertSpotter - Relationships \n\n")
+    print(cert_spotter_relationships)
+
+main("example.com")
