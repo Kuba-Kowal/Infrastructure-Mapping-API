@@ -7,22 +7,23 @@ from dotenv import load_dotenv
 from dataclasses import dataclass
 from datetime import date
 from itertools import chain
+from collections import deque
 
 # ----------------------------
 # Data models - Raw
 # ----------------------------
 @dataclass
 class Queue:
-    queue:list
-    seen:set
+    queue: deque[str]
+    seen: set[str]
 
-    def next_item_in_queue(self):
-        next_item = self.queue.pop(0)
+    def next_item_in_queue(self) -> str:
+        next_item = self.queue.popleft()
         self.seen.add(next_item)
 
         return next_item
 
-    def add_to_queue(self, domains):
+    def add_to_queue(self, domains: list[str]) -> None:
         for domain in domains:
             if domain in self.seen or domain in self.queue:
                 continue
@@ -33,32 +34,27 @@ class Queue:
 
 @dataclass(frozen=True, slots=True)
 class Certificate:
-    id:str
-    issuer:str
-    not_before:date
-    not_after:date
+    id: str
+    issuer: str
+    not_before: date
+    not_after: date
 
 @dataclass(frozen=True, slots=True)
 class FQDN:
-    domain:str
+    domain: str
 
 @dataclass(frozen=True, slots=True)
 class IPAddress:
-    ip:str
-
-@dataclass(frozen=True, slots=True)
-class DNSRecord:
-    record_type:str
-    record:dict
+    ip: str
 
 @dataclass(frozen=True, slots=True)
 class ASN:
-    as_number:int
-    as_name:str
+    as_number: int
+    as_name: str
 
 @dataclass(frozen=True, slots=True)
 class Prefix:
-    prefix:str
+    prefix: str
 
 # ----------------------------
 # Data models - Relational
@@ -66,44 +62,44 @@ class Prefix:
 
 @dataclass(frozen=True, slots=True)
 class CerttoFQDN:
-    certificate:Certificate
-    fqdn:FQDN
-    observed_at:str
+    certificate: Certificate
+    fqdn: FQDN
+    observed_at: str
 
 @dataclass(frozen=True, slots=True)
 class IPtoPrefix:
-    ip:IPAddress
-    prefix:Prefix
-    observed_at:str
+    ip: IPAddress
+    prefix: Prefix
+    observed_at: str
 
 @dataclass(frozen=True, slots=True)
 class PrefixtoASN:
-    prefix:Prefix
-    asn:ASN
-    observed_at:str
+    prefix: Prefix
+    asn: ASN
+    observed_at: str
 
 @dataclass(frozen=True, slots=True)
 class FQDNtoDNS:
-    domain:FQDN
-    record_type:str
-    record:list[str]
+    domain: FQDN
+    record_type: str
+    record: list[str]
 
 @dataclass(frozen=True, slots=True)
 class FQDNtoPassiveDNS:
-    fqdn:FQDN
-    ip:IPAddress
-    last_observed:date
-    source:str
+    fqdn: FQDN
+    ip: IPAddress
+    last_observed: ip['last_resolved']
+    source: str
 
 # ----------------------------
 # Networking layer
 # ----------------------------
 
-def resolve_dns_query(domain, rtype="A") -> list(answer):
+def resolve_dns_query(domain: str, rtype: str) -> list[str]:
     answers = dns.resolver.resolve(domain, rtype)
     return [str(answer) for answer in answers]
 
-def fetch_crt_sh(domain) -> tuple(dict(certificate), list(domain)):
+def fetch_crt_sh(domain: str) -> tuple[list[dict[str, str]], list[str]]:
     MAX_RETRIES = 20
     RATE_LIMIT = 0.5
 
@@ -135,9 +131,9 @@ def fetch_crt_sh(domain) -> tuple(dict(certificate), list(domain)):
             return data, all_domains
 
     print("[-] FAILED - MAX RETRIES")
-    return dict(), list()
+    return [], []
 
-def fetch_cert_spotter(domain) -> tuple(dict(certificate), list(domain)):
+def fetch_cert_spotter(domain: str) -> tuple[list[dict], list[str]]:
     API_KEY = os.getenv("CERT_SPOTTER_API")
     RATE_LIMIT = 2
     MAX_RETRIES = 5
@@ -174,9 +170,9 @@ def fetch_cert_spotter(domain) -> tuple(dict(certificate), list(domain)):
             return data, all_domains
 
     print("[-] FAILED - MAX RETRIES")
-    return dict(), list()
+    return [], []
 
-def fetch_vt(domain) -> tuple(dict(ips), list(domain)):
+def fetch_vt(domain: str) -> tuple[dict[str, dict[str, str]], list[str]]:
     API_KEY = os.getenv("VT_API_KEY")
     RATE_LIMIT = 3
     MAX_RETRIES = 3
@@ -213,7 +209,7 @@ def fetch_vt(domain) -> tuple(dict(ips), list(domain)):
 # Data Collection Layer
 # ----------------------------
 
-def ct_log_fetch_pipeline(TARGET_DOMAIN):
+def ct_log_fetch_pipeline(TARGET_DOMAIN: str) -> tuple[list[dict[str: any]]]:
     crt_sh_results = []
     crt_sh_seen_ids = set()
 
@@ -243,7 +239,7 @@ def ct_log_fetch_pipeline(TARGET_DOMAIN):
 
     return crt_sh_results, cert_spotter_results
 
-def vt_fetch_pipeline(TARGET_DOMAIN):
+def vt_fetch_pipeline(TARGET_DOMAIN: str) -> list[dict[str, str]]:
     vt_results = []
 
     queue = Queue([TARGET_DOMAIN], set())
@@ -262,7 +258,7 @@ def vt_fetch_pipeline(TARGET_DOMAIN):
 # ----------------------------
 # Data Processing Layer (Certificate Objects)
 # ----------------------------
-def process_crt_sh_log_data(crt_sh_data):
+def process_crt_sh_log_data(crt_sh_data: list[dict[str, str]]) -> tuple[list[Certificate], list[FQDN], list[CerttoFQDN]]:
     certificates = []
     FQDNs = []
     relationships = []
@@ -310,7 +306,7 @@ def process_crt_sh_log_data(crt_sh_data):
 
     return certificates, FQDNs, relationships
 
-def process_cert_spotter_data(cert_spotter_data):
+def process_cert_spotter_data(cert_spotter_data: list[dict[str, str]]) -> tuple[list[Certificate], list[FQDN], list[CerttoFQDN]]:
     certificates = []
     FQDNs = []
     relationships = []
@@ -357,7 +353,7 @@ def process_cert_spotter_data(cert_spotter_data):
 
     return certificates, FQDNs, relationships
 
-def process_vt_data(vt_data):
+def process_vt_data(vt_data: list[dict[str, str]]) -> tuple[list[FQDN], list[IPAddress], list[FQDNtoPassiveDNS]]:
     FQDNs = []
     IPs = []
     relationships = []
@@ -406,18 +402,24 @@ def process_vt_data(vt_data):
 # Data Collection & Processing Layer (FQDNtoDNS Objects)
 # ----------------------------
 
-def cname_fetch_pipeline(FQDN_data: list[FQDN]) -> tuple(list[FQDNtoDNS], list[FQDN]):
+def cname_fetch_pipeline(FQDN_data: list[FQDN]) -> tuple[list[FQDNtoDNS], list[FQDN]]:
     results = []
+    seen_domains = set()
     new_cnames = set()
     new_fqdns = []
 
     for domain in FQDN_data:
-        domain = domain.domain
-        if domain.startswith("*"):
+        domain_unpacked = domain.domain
+
+        if domain_unpacked.startswith("*"):
             continue
+        if domain_unpacked in seen_domains:
+            continue
+        seen_domains.add(domain_unpacked)
+
         print(f"[+] DNS TYPE: CNAME | {domain}")
         try:
-            query_result = resolve_dns_query(domain, "CNAME")
+            query_result = resolve_dns_query(domain_unpacked, "CNAME")
 
         except dns.resolver.NXDOMAIN:
             continue
@@ -432,8 +434,13 @@ def cname_fetch_pipeline(FQDN_data: list[FQDN]) -> tuple(list[FQDNtoDNS], list[F
         
     while len(new_cnames) > 0:
         domain = new_cnames.pop()
+
         if domain.startswith("*"):
             continue
+        if domain in seen_domains:
+            continue
+        seen_domains.add(domain)
+
         print(f"[+] DNS TYPE: CNAME | {domain}")
         new_fqdns.append(FQDN(domain))
         try:
@@ -448,23 +455,24 @@ def cname_fetch_pipeline(FQDN_data: list[FQDN]) -> tuple(list[FQDNtoDNS], list[F
         for result in query_result:
             new_cnames.add(str(result))
 
-        results.append(FQDNtoDNS(domain, "CNAME", query_result))
+        results.append(FQDNtoDNS(FQDN(domain), "CNAME", query_result))
 
     return results, new_fqdns
 
 def dns_record_pipeline(FQDN_data: list[FQDN]) -> list[FQDNtoDNS]:
     results = []
+    seen_domains = set()
 
     infrastructure_mapping_records = ["A", "AAAA", "NS", "MX", "TXT", "SOA", "SRV"]
     for record_type in infrastructure_mapping_records:
         for domain in FQDN_data:
-            domain = domain.domain
-            if domain.startswith("*"):
+            domain_unpacked = domain.domain
+            if domain_unpacked.startswith("*"):
                 continue
-            print(f"[+] DNS TYPE: {record_type} | {domain}")
+            print(f"[+] DNS TYPE: {record_type} | {domain_unpacked}")
             
             try:
-                query_result = resolve_dns_query(domain, record_type)
+                query_result = resolve_dns_query(domain_unpacked, record_type)
 
             except dns.resolver.NXDOMAIN:
                 query_result = ["NXDOMAIN"]
@@ -480,7 +488,7 @@ def dns_record_pipeline(FQDN_data: list[FQDN]) -> list[FQDNtoDNS]:
 
     return results
 
-def main(TARGET_DOMAIN):
+def main(TARGET_DOMAIN: str) -> None:
     load_dotenv()
 
     print("[+] BEGIN HISTORICAL DNS & SUBDOMAIN PIPELINE\n")
