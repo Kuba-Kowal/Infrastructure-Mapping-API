@@ -2,9 +2,11 @@ import requests
 import json
 import time
 import os
+import dns.resolver
 from dotenv import load_dotenv
 from dataclasses import dataclass
 from datetime import date
+from itertools import chain
 
 # ----------------------------
 # Data models - Raw
@@ -82,9 +84,9 @@ class PrefixtoASN:
 
 @dataclass(frozen=True, slots=True)
 class FQDNtoDNS:
-    fqdn:FQDN
-    dns_record:DNSRecord
-    observed_at:str
+    domain:FQDN
+    record_type:str
+    record:list[str]
 
 @dataclass(frozen=True, slots=True)
 class FQDNtoPassiveDNS:
@@ -97,7 +99,11 @@ class FQDNtoPassiveDNS:
 # Networking layer
 # ----------------------------
 
-def fetch_crt_sh(domain):
+def resolve_dns_query(domain, rtype="A") -> list(answer):
+    answers = dns.resolver.resolve(domain, rtype)
+    return [str(answer) for answer in answers]
+
+def fetch_crt_sh(domain) -> tuple(dict(certificate), list(domain)):
     MAX_RETRIES = 20
     RATE_LIMIT = 0.5
 
@@ -111,7 +117,7 @@ def fetch_crt_sh(domain):
         try:
             req = requests.get(url, timeout=60)
         except Exception as e:
-            print(e)
+            print(f"[-] FAILED - {e}")
             continue
 
         if req.status_code == 200:
@@ -131,7 +137,7 @@ def fetch_crt_sh(domain):
     print("[-] FAILED - MAX RETRIES")
     return dict(), list()
 
-def fetch_cert_spotter(domain):
+def fetch_cert_spotter(domain) -> tuple(dict(certificate), list(domain)):
     API_KEY = os.getenv("CERT_SPOTTER_API")
     RATE_LIMIT = 2
     MAX_RETRIES = 5
@@ -150,7 +156,7 @@ def fetch_cert_spotter(domain):
         try:
             req = requests.get(url, headers=headers, timeout=20)
         except Exception as e:
-            print(e)
+            print(f"[-] FAILED - {e}")
             continue
 
         if req.status_code == 200:
@@ -170,7 +176,7 @@ def fetch_cert_spotter(domain):
     print("[-] FAILED - MAX RETRIES")
     return dict(), list()
 
-def fetch_vt(domain):
+def fetch_vt(domain) -> tuple(dict(ips), list(domain)):
     API_KEY = os.getenv("VT_API_KEY")
     RATE_LIMIT = 3
     MAX_RETRIES = 3
@@ -184,7 +190,7 @@ def fetch_vt(domain):
         try:
             req = requests.get(url, timeout=20)
         except Exception as e:
-            print(e)
+            print(f"[-] FAILED - {e}")
             continue
 
         if req.status_code == 200:
@@ -254,7 +260,7 @@ def vt_fetch_pipeline(TARGET_DOMAIN):
     return vt_results
 
 # ----------------------------
-# Data Processing Layer (Object Creation)
+# Data Processing Layer (Certificate Objects)
 # ----------------------------
 def process_crt_sh_log_data(crt_sh_data):
     certificates = []
@@ -361,8 +367,6 @@ def process_vt_data(vt_data):
     # Itterate through dataset
     for entry in vt_data:
             for domain, report in entry.items():
-                print(domain)
-                print(report)
                 fqdn_object = FQDN(domain)
 
                 # Create FQDN Objects
@@ -398,34 +402,139 @@ def process_vt_data(vt_data):
 
     return FQDNs, IPs, relationships
 
+# ----------------------------
+# Data Collection & Processing Layer (FQDNtoDNS Objects)
+# ----------------------------
+
+def cname_fetch_pipeline(FQDN_data: list[FQDN]) -> tuple(list[FQDNtoDNS], list[FQDN]):
+    results = []
+    new_cnames = set()
+    new_fqdns = []
+
+    for domain in FQDN_data:
+        domain = domain.domain
+        if domain.startswith("*"):
+            continue
+        print(f"[+] DNS TYPE: CNAME | {domain}")
+        try:
+            query_result = resolve_dns_query(domain, "CNAME")
+
+        except dns.resolver.NXDOMAIN:
+            continue
+
+        except dns.resolver.NoAnswer:
+            continue
+
+        for result in query_result:
+            new_cnames.add(str(result))
+
+        results.append(FQDNtoDNS(domain, "CNAME", query_result))
+        
+    while len(new_cnames) > 0:
+        domain = new_cnames.pop()
+        if domain.startswith("*"):
+            continue
+        print(f"[+] DNS TYPE: CNAME | {domain}")
+        new_fqdns.append(FQDN(domain))
+        try:
+            query_result = resolve_dns_query(domain, "CNAME")
+
+        except dns.resolver.NXDOMAIN:
+            continue
+
+        except dns.resolver.NoAnswer:
+            continue
+
+        for result in query_result:
+            new_cnames.add(str(result))
+
+        results.append(FQDNtoDNS(domain, "CNAME", query_result))
+
+    return results, new_fqdns
+
+def dns_record_pipeline(FQDN_data: list[FQDN]) -> list[FQDNtoDNS]:
+    results = []
+
+    infrastructure_mapping_records = ["A", "AAAA", "NS", "MX", "TXT", "SOA", "SRV"]
+    for record_type in infrastructure_mapping_records:
+        for domain in FQDN_data:
+            domain = domain.domain
+            if domain.startswith("*"):
+                continue
+            print(f"[+] DNS TYPE: {record_type} | {domain}")
+            
+            try:
+                query_result = resolve_dns_query(domain, record_type)
+
+            except dns.resolver.NXDOMAIN:
+                query_result = ["NXDOMAIN"]
+                results.append(FQDNtoDNS(domain, record_type, query_result)) # NXDOMAIN: No such hostname
+                continue
+
+            except dns.resolver.NoAnswer:
+                query_result = ["NOANSWER"]
+                results.append(FQDNtoDNS(domain, record_type, query_result)) # NOANSWER: Domain exists, but record type doesn't
+                continue 
+
+            results.append(FQDNtoDNS(domain, record_type, query_result))
+
+    return results
+
 def main(TARGET_DOMAIN):
     load_dotenv()
+
+    print("[+] BEGIN HISTORICAL DNS & SUBDOMAIN PIPELINE\n")
+    # == Certificate & Subdomain Layer ==
     vt_data = vt_fetch_pipeline(TARGET_DOMAIN)
+
+    print("\n[+] BEGIN CERTIFICATE LOG PIPELINE\n")
     crt_sh_data, cert_spotter_data = ct_log_fetch_pipeline(TARGET_DOMAIN)
 
     crt_sh_certificates, crt_sh_FQDNs, crt_sh_relationships = process_crt_sh_log_data(crt_sh_data)
     cert_spotter_certificates, cert_spotter_FQDNs, cert_spotter_relationships = process_cert_spotter_data(cert_spotter_data)
     vt_FQDNs, vt_IPs, vt_relationships = process_vt_data(vt_data)
 
-    print("\n\n\n VT - IPs \n\n")
-    print(vt_IPs)
-    print("\n\n\n VT - FQDNs \n\n")
-    print(vt_FQDNs)
-    print("\n\n\n VT - Relationships \n\n")
-    print(vt_relationships)
+    certificates = list(set(chain(crt_sh_certificates, cert_spotter_certificates)))
+    FQDNs = list(chain(crt_sh_FQDNs, cert_spotter_FQDNs, vt_FQDNs))
 
-    print("\n\n\n CRT.SH - Certificates \n\n")
-    print(crt_sh_certificates)
-    print("\n\n\n CRT.SH - FQDNs \n\n")
-    print(crt_sh_FQDNs)
-    print("\n\n\n CRT.SH - Relationships \n\n")
-    print(crt_sh_relationships)
+    certificate_to_domain_relationships = list(set(chain(crt_sh_relationships, cert_spotter_relationships)))
+    fqdn_to_historical_ip_relationships = list(set(vt_relationships))
 
-    print("\n\n\n CertSpotter - Certificates \n\n")
-    print(cert_spotter_certificates)
-    print("\n\n\n CertSpotter- FQDNs \n\n")
-    print(cert_spotter_FQDNs)
-    print("\n\n\n CertSpotter - Relationships \n\n")
-    print(cert_spotter_relationships)
+    # == DNS Layer ==
+    print("\n[+] BEGIN DNS PIPELINE\n")
+    dns_relationships, dns_fqdns = cname_fetch_pipeline(FQDNs)
+
+    FQDNs = list(set(chain(FQDNs, dns_fqdns)))
+
+    temp_fqdn_to_dns_relationships = chain(dns_record_pipeline(FQDNs), dns_relationships)
+    fqdn_to_dns_relationships = []
+
+    for relationship in temp_fqdn_to_dns_relationships:
+        if relationship.record[0] == "NXDOMAIN" or relationship.record[0] == "NOANSWER":
+            continue
+        fqdn_to_dns_relationships.append(relationship)
+        
+
+    # == Output Layer ==
+
+    print("\n\n\n FQDNs \n\n")
+    print(FQDNs)
+
+    print("\n\n\n Certificates \n\n")
+    print(certificates)
+
+    print("\n\n\n FQDN <-> pDNS \n\n")
+    print(fqdn_to_historical_ip_relationships)
+
+    print("\n\n\n CERT <-> FQDN \n\n")
+    print(certificate_to_domain_relationships)
+
+    print("\n\n\n FQDN <-> DNS \n\n")
+    print(fqdn_to_dns_relationships)
 
 main("example.com")
+
+# Next Steps Post ASN and BGP Implementation
+# Async, Potential utilisation of databases to reduce memory usage
+# Fix typehinting
+# AI implementation for automated inference of data, operational groupings, managemental groupings etc.
