@@ -1,0 +1,6 @@
+{
+    "_comment": "crtsh can be quite slow, I recommend just using virustotal and certspotter",
+    "crtsh": false, 
+    "certspotter": true,
+    "virustotal": true
+}

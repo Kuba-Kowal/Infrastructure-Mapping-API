@@ -1,7 +1,8 @@
 import requests
 import time
+import asyncio
 
-def fetch_crtsh(domain: str) -> list[dict[str, Any]] | list:
+async def fetch_crtsh(domain: str, sem: asyncio.Sempahore, session: aiohttp.ClientSession) -> list[dict[str, Any]] | list:
     MAX_RETRIES = 20
     RATE_LIMIT = 0.5
 
@@ -9,19 +10,20 @@ def fetch_crtsh(domain: str) -> list[dict[str, Any]] | list:
 
     print(f"[⋆] QUERY CRT.SH | {domain}")
 
-    for i in range (MAX_RETRIES):
-        time.sleep(RATE_LIMIT)
-
+    for i in range(MAX_RETRIES):
         try:
-            req = requests.get(url, timeout=60)
-        except Exception as e:
-            print(f"[-] FAILED - {e}")
+            async with sem:
+                async with session.get(url, ssl=False, timeout=15) as resp:
+                    if resp.status == 200:
+                        print(f"[+] SUCCESS CRTSH | {domain}")
+                        return await resp.json()
+                    
+                await asyncio.sleep(RATE_LIMIT)
+                
+        except asyncio.TimeoutError:
+            continue
+        except aiohttp.ClientConnectionError:
             continue
 
-        if req.status_code == 200:
-            print("[+] SUCCESS")
-
-            return req.json()
-
-    print("[-] FAILED - MAX RETRIES")
+    print(f"[-] FAILED - MAX RETRIES | CRTSH | {domain}")
     return []

@@ -5,28 +5,57 @@ from pipelines.certspotter_pipeline import certspotter_pipeline
 from pipelines.cymru_pipeline import cymru_pipeline
 from core.graph import Graph
 from core.models import *
+from core.configuration import create_config
+from core.write_to_json import write_to_json
+import sys
+import asyncio
+import time
 
 graph = Graph()
 
-TARGET_DOMAINS = ["example.com"]
+async def main(input_data, config):
+    try:
+        for domain in input_data:
+            graph.fqdns.add(FQDN(domain))
 
-def main(TARGET_DOMAINS):
-    print("\n-- [+] BEGIN VT RECON --\n")
-    virustotal_pipeline(TARGET_DOMAINS, graph)
+        start = time.perf_counter()
 
-    print("\n-- [+] BEGIN CRTSH RECON --\n")
-    crtsh_pipeline(graph)
+        async with asyncio.TaskGroup() as tg:
+            print("\n-- [+] BEGIN PASSIVE RECON --\n")
+            if config["virustotal"]:
+                tg.create_task(virustotal_pipeline(graph))
 
-    print("\n-- [+] BEGIN CERTSPOTTER RECON --\n")
-    certspotter_pipeline(graph)
+            if config["crtsh"]:
+                while True:
+                    try:
+                        tg.create_task(crtsh_pipeline(graph))
+                        break
+                    except ValueError:
+                        continue
+
+            if config["certspotter"]:
+                tg.create_task(certspotter_pipeline(graph))
+
+        print("\n-- [+] BEGIN DNS RECON --\n")
+        dns_pipeline(graph)
+
+        print("\n-- [+] BEGIN BGP RECON --\n")
+        cymru_pipeline(graph)
+
+        end = time.perf_counter()
+
+        write_to_json(graph, config)
+
+        print(f"\n\n\n\nTotal runtime: {end - start:.2f} seconds\n\n\n\n")
+
+    except asyncio.CancelledError:
+        print("\nExiting.")
+        sys.exit()
+
+    except KeyboardInterrupt:
+        print("\nExiting.")
+        sys.exit()
 
 
-    print("\n-- [+] BEGIN DNS RECON --\n")
-    dns_pipeline(graph)
-
-    print("\n-- [+] BEGIN BGP RECON --\n")
-    cymru_pipeline(graph)
-
-main(TARGET_DOMAINS)
-
-print(graph)
+config = create_config()
+asyncio.run(main([domain for domain in config["domains"]], config))

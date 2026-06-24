@@ -12,6 +12,7 @@ def fetch_origin_asn(ip: str) -> dns.resolver.Answer | None:
         dns.resolver.NXDOMAIN,
         dns.resolver.NoAnswer,
         dns.resolver.Timeout,
+        dns.resolver.NoNameservers,
     ):
         return None
     
@@ -27,6 +28,7 @@ def fetch_asn_metadata(asn: str) -> dns.resolver.Answer | None:
         dns.resolver.NXDOMAIN,
         dns.resolver.NoAnswer,
         dns.resolver.Timeout,
+        dns.resolver.NoNameservers,
     ):
         return None
 

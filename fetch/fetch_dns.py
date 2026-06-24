@@ -9,5 +9,6 @@ def resolve_dns_query(domain: str, rtype: str) -> dns.resolver.Answer | None:
         dns.resolver.NXDOMAIN,
         dns.resolver.NoAnswer,
         dns.resolver.Timeout,
+        dns.resolver.NoNameservers,
     ):
         return None

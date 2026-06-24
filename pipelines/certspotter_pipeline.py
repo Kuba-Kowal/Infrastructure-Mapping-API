@@ -4,17 +4,53 @@ from fetch.certspotter import fetch_certspotter
 from expand.expand_certspotter import expand_certspotter
 from process.process_cerspotter import process_certspotter
 from collections import deque
+import asyncio
+import aiohttp
 
-def certspotter_pipeline(graph: Graph) -> None:
-    queue = Queue(deque(graph.get_domains()), set())
+async def certspotter_pipeline(graph: Graph) -> None:
+    seen = set()
+    sem = asyncio.Semaphore(2)
 
-    while len(queue.queue) > 0:
-        domain = queue.next_item_in_queue()
+    async with aiohttp.ClientSession() as session:
+        tasks = {}
 
-        raw_data = fetch_certspotter(domain)
+        # Seeding - create first group of tasks based on input graph
+        for fqdn in graph.fqdns:
+            domain = fqdn.domain
 
-        process_certspotter(raw_data, graph)
+            seen.add(domain)
 
-        new_domains = expand_certspotter(raw_data)
-        
-        queue.add_to_queue(new_domains)
+            task = asyncio.create_task(fetch_certspotter(domain, sem, session))
+            tasks[task] = domain
+
+        # Run when tasks[str[asyncio.Task]] 
+        while tasks:
+            done, _ = await asyncio.wait(
+                tasks.keys(),
+                return_when = asyncio.FIRST_COMPLETED
+            )
+
+            for task in done:
+                tasks.pop(task)
+
+                raw_data = await task
+
+                if raw_data:
+                    process_certspotter(raw_data, graph)
+
+                    new_domains = expand_certspotter(raw_data)
+
+                else:
+                    new_domains = None
+
+                if new_domains:
+                    for new_domain in new_domains:
+                        if new_domain in seen:
+                            continue
+
+                        seen.add(new_domain)
+
+                        new_task = asyncio.create_task(fetch_certspotter(new_domain, sem, session))
+                        tasks[new_task] = new_domain
+
+    return

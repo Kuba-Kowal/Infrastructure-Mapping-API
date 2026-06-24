@@ -29,7 +29,7 @@ def process_certspotter(cert_spotter_data: list[dict[str, str]], graph: Graph) -
             not_after = None
 
         # Create certificate object utilising these fields
-        cert_object = Certificate(certificate['id'], issuer, not_before, not_after)
+        cert_object = Certificate(str(certificate['id']), issuer, not_before, not_after)
         graph.certificates.add(cert_object)
 
         # Create FQDN object based on SANs

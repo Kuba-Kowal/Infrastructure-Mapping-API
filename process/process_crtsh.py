@@ -13,6 +13,7 @@ def process_crtsh(crt_sh_data: list[dict[str, str]], graph: Graph) -> None:
                     for field in certificate['issuer_name'].split(",")
                     if field.strip().startswith("O=")
                 )
+                issuer = issuer.strip("\\").strip('"')
         else:
             issuer = "Unknown"
 
@@ -31,7 +32,7 @@ def process_crtsh(crt_sh_data: list[dict[str, str]], graph: Graph) -> None:
             not_after = None
 
         # Create certificate object utilising these fields
-        cert_object = Certificate(certificate['id'], issuer, not_before, not_after)
+        cert_object = Certificate(str(certificate['id']), issuer, not_before, not_after)
         graph.certificates.add(cert_object)
 
         # Create FQDN object based on SANs

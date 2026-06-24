@@ -2,7 +2,6 @@ from dataclasses import dataclass
 # ----------------------------
 # Data models - Raw
 # ----------------------------
-
 class Source(str):
     CRT_SH = "crt.sh"
     CERT_SPOTTER = "certspotter"
