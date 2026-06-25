@@ -1,5 +1,4 @@
-**Usage**
-``python main.py -d example.com [-o example.json]``
+**Usage:** ``python main.py -d example.com [-o example.json]``
 
 **Example Output**
 ```
