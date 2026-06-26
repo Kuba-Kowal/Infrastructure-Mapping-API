@@ -16,7 +16,7 @@ def cymru_pipeline(graph: Graph) -> None:
 
         process_cymru_origin(cymru_origin, ip, graph)
 
-    for asn in graph.asns:
+    for asn in graph.asns.values():
         asn = asn.as_number
 
         asn_metadata = fetch_asn_metadata(asn)

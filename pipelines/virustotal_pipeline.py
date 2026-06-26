@@ -12,7 +12,7 @@ async def virustotal_pipeline(graph: Graph) -> None:
     async with aiohttp.ClientSession() as session:
         tasks = {}
 
-        for fqdn in graph.fqdns:
+        for fqdn in graph.fqdns.values():
             domain = fqdn.domain
 
             seen.add(domain)

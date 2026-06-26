@@ -1,11 +1,11 @@
 from core.models import *
+from core.generate_hash import generate_hash
 
 def process_virustotal(vt_data: list[dict[str, str]], domain: str, graph: Graph) -> None:
     fqdn_object = FQDN(domain)
 
     # Create FQDN Objects
-    if not domain.startswith("*"):
-        graph.fqdns.add(fqdn_object)
+    graph.add_node(fqdn_object)
 
     # Create IP Objects
     if vt_data.get('resolutions') is not None:
@@ -20,7 +20,7 @@ def process_virustotal(vt_data: list[dict[str, str]], domain: str, graph: Graph)
                 last_observed = "unkown"
 
             ip_object = IPAddress(ip_addr)
-            graph.ips.add(ip_object)
+            graph.add_node(ip_object)
 
             # Create FQDN to pDNS Relationship Object
-            graph.fqdn_to_pdns.add(FQDNtoPassiveDNS(fqdn_object, ip_object, last_observed, Source.VIRUSTOTAL))
+            graph.add_edge(FQDNtoPassiveDNS(generate_hash(fqdn_object), generate_hash(ip_object), last_observed, Source.VIRUSTOTAL))

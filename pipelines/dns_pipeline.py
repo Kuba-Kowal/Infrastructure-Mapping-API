@@ -19,6 +19,9 @@ def dns_pipeline(graph: Graph) -> None:
     while len(queue.queue):
         domain = queue.next_item_in_queue()
 
+        if domain.startswith("*"):
+            continue
+
         dns_answer = resolve_dns_query(domain, "CNAME")
 
         if dns_answer:

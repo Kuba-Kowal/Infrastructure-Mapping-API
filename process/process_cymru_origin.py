@@ -1,5 +1,5 @@
 from core.models import *
-
+from core.generate_hash import generate_hash
 
 def process_cymru_origin(data: dict[str, str], ip: str, graph: Graph) -> None:
     results = []
@@ -21,9 +21,9 @@ def process_cymru_origin(data: dict[str, str], ip: str, graph: Graph) -> None:
                 prefix_object = Prefix(prefix)
                 asn_object = ASN(asn)
 
-                graph.ips.add(ip_object)
-                graph.asns.add(asn_object)
-                graph.prefixes.add(prefix_object)
+                graph.add_node(ip_object)
+                graph.add_node(asn_object)
+                graph.add_node(prefix_object)
 
-                graph.ip_to_prefix.add(IPtoPrefix(ip_object, prefix_object, Source.CYMRU))
-                graph.prefix_to_asn.add(PrefixtoASN(prefix_object, asn_object, Source.CYMRU))
+                graph.add_edge(IPtoPrefix(generate_hash(ip_object), generate_hash(prefix_object), Source.CYMRU))
+                graph.add_edge(PrefixtoASN(generate_hash(prefix_object), generate_hash(asn_object), Source.CYMRU))

@@ -35,6 +35,11 @@ class Prefix:
 class Organisation:
     organisation: str
 
+@dataclass(frozen=True, slots=True)
+class DNSRecord:
+    type: str
+    data: list[str]
+
 # ----------------------------
 # Data models - Relational
 # ----------------------------
@@ -58,7 +63,7 @@ class PrefixtoASN:
     observed_at: Source
 
 @dataclass(frozen=True, slots=True)
-class ASToOrganisation:
+class AStoOrganisation:
     asn: ASN
     organisation: Organisation
     observed_at: Source
@@ -66,8 +71,8 @@ class ASToOrganisation:
 @dataclass(frozen=True, slots=True)
 class FQDNtoDNS:
     domain: FQDN
-    record_type: str
-    record: list[str]
+    record: DNSRecord
+    observed_at: Source
 
 @dataclass(frozen=True, slots=True)
 class FQDNtoPassiveDNS:

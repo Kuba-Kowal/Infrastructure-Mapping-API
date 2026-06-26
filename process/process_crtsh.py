@@ -1,4 +1,5 @@
 from core.models import *
+from core.generate_hash import generate_hash
 from datetime import date
 
 def process_crtsh(crt_sh_data: list[dict[str, str]], graph: Graph) -> None:
@@ -33,16 +34,14 @@ def process_crtsh(crt_sh_data: list[dict[str, str]], graph: Graph) -> None:
 
         # Create certificate object utilising these fields
         cert_object = Certificate(str(certificate['id']), issuer, not_before, not_after)
-        graph.certificates.add(cert_object)
+        graph.add_node(cert_object)
 
         # Create FQDN object based on SANs
         for domain in certificate["name_value"].split('\n'):
             fqdn_object = FQDN(domain)
             if domain not in crt_sh_FQDNs:
                 crt_sh_FQDNs.add(domain)
-                if  domain.startswith("*"):
-                    continue
                 graph.fqdns.add(fqdn_object)
 
             # Create FQDN <-> Certificate Mapping Object
-            graph.cert_to_fqdn.add(CerttoFQDN(cert_object, fqdn_object, Source.CRT_SH))
+            graph.add_edge(CerttoFQDN(generate_hash(cert_object), generate_hash(fqdn_object), Source.CRT_SH))

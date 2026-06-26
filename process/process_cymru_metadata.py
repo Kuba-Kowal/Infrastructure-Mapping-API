@@ -1,4 +1,5 @@
 from core.models import *
+from core.generate_hash import generate_hash
 import dns.resolver
 
 def process_cymru_metadata(data: Answer, asn: str, graph: Graph) -> None:
@@ -10,8 +11,8 @@ def process_cymru_metadata(data: Answer, asn: str, graph: Graph) -> None:
             org_object = Organisation(str(org))
             asn_object = ASN(asn)
 
-            graph.organisations.add(Organisation(org_object))
+            graph.add_node(org_object)
             
-            graph.asn_to_org.add(ASToOrganisation(asn_object, org_object, Source.CYMRU))
+            graph.add_edge(AStoOrganisation(generate_hash(asn_object), generate_hash(org_object), Source.CYMRU))
 
     

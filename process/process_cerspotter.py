@@ -1,4 +1,5 @@
 from core.models import *
+from core.generate_hash import generate_hash
 from datetime import date
 
 def process_certspotter(cert_spotter_data: list[dict[str, str]], graph: Graph) ->  None:
@@ -8,7 +9,7 @@ def process_certspotter(cert_spotter_data: list[dict[str, str]], graph: Graph) -
         # Extract issuer name
         if certificate.get('issuer') is not None:
             if certificate['issuer'].get('friendly_name') is not None:
-                issuer = certificate['issuer']['friendly_name']
+                issuer = certificate['issuer']['friendly_name'].strip("\\")
             else:
                 issuer = "Unknown"
         else:
@@ -30,7 +31,7 @@ def process_certspotter(cert_spotter_data: list[dict[str, str]], graph: Graph) -
 
         # Create certificate object utilising these fields
         cert_object = Certificate(str(certificate['id']), issuer, not_before, not_after)
-        graph.certificates.add(cert_object)
+        graph.add_node(cert_object)
 
         # Create FQDN object based on SANs
         if certificate.get('dns_names') is not None:
@@ -38,9 +39,7 @@ def process_certspotter(cert_spotter_data: list[dict[str, str]], graph: Graph) -
                 fqdn_object = FQDN(domain)
                 if domain not in cert_spotter_FQDNs:
                     cert_spotter_FQDNs.add(domain)
-                    if domain.startswith("*"):
-                        continue
-                    graph.fqdns.add(fqdn_object)
+                    graph.add_node(fqdn_object)
 
                 # Create FQDN <-> Certificate Mapping Object
-                graph.cert_to_fqdn.add(CerttoFQDN(cert_object, fqdn_object, Source.CERT_SPOTTER))
+                graph.add_edge(CerttoFQDN(generate_hash(cert_object), generate_hash(fqdn_object), Source.CERT_SPOTTER))

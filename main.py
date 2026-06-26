@@ -16,7 +16,7 @@ graph = Graph()
 async def main(input_data, config):
     try:
         for domain in input_data:
-            graph.fqdns.add(FQDN(domain))
+            graph.add_node(FQDN(domain))
 
         start = time.perf_counter()
 

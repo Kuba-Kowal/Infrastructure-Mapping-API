@@ -6,5 +6,10 @@ def write_to_json(graph: Graph, config: [dict]):
         else:
             output_location = config["output"]
 
-        with open(output_location, "w") as f:
-            json.dump(graph.to_dict(), f, indent=4, default=str)
+        try:
+            with open(output_location, "w") as f:
+                json.dump(graph.to_dict(), f, indent=4, default=str)
+        except:
+            print(f"Error writing to {output_location}. Defaulting ./graph.json")
+            with open("graph.json", "w") as f:
+                json.dump(graph.to_dict(), f, indent=4, default=str)
