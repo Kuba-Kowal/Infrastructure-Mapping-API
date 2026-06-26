@@ -83,6 +83,7 @@ class Graph:
             "prefixes": {prefix_hash: prefix.prefix for prefix_hash, prefix in self.prefixes.items()},
             "asns": {asn_hash: asn.as_number for asn_hash, asn in self.asns.items()},
             "organisations": {org_hash: organisation.organisation for org_hash, organisation in self.organisations.items()},
+            "dns_records": {dns_hash: dns_record.data for dns_hash, dns_record in self.dns_records.items()},
 
             "cert_to_fqdn": [asdict(r) for r in self.cert_to_fqdn],
             "fqdn_to_dns": [asdict(r) for r in self.fqdn_to_dns],
@@ -90,4 +91,5 @@ class Graph:
             "ip_to_prefix": [asdict(r) for r in self.ip_to_prefix],
             "prefix_to_asn": [asdict(r) for r in self.prefix_to_asn],
             "asn_to_org": [asdict(r) for r in self.asn_to_org],
+            
         }
