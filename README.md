@@ -103,6 +103,5 @@ Total runtime: 155.85 seconds
 aiohttp==3.14.1
 dnspython==2.8.0
 python-dotenv==1.2.2
-Requests==2.34.2
 ```
 
