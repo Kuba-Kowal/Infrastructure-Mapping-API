@@ -1,10 +1,10 @@
 # Overview
 
-> An asynchronous passive reconnaissance graphing tool for infrastructural mapping across ASN, pDNS, DNS and CT log data.
->
-> Capable of automatically and cleanly displaying (to be implemented) relationships between infrastructure for educated defensive and offensive decision making and asset discovery.
->
-> Designed to save time and effort for penetration testers, bug bounty hunters and security specialists.
+An asynchronous passive reconnaissance graphing tool for infrastructural mapping across ASN, pDNS, DNS and CT log data.
+
+Capable of automatically and cleanly displaying (to be implemented) relationships between infrastructure for educated defensive and offensive decision making and asset discovery.
+
+Designed to save time and effort for penetration testers, bug bounty hunters and security specialists.
 
 ```
 Sources (crt.sh / Virustotal / CertSpotter / Cymru ASN)
