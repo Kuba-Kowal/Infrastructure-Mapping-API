@@ -1,0 +1,64 @@
+2. TLS / HTTPS Internals
+SNI
+ALPN
+OCSP
+SANs
+wildcard cert behavior
+mutual TLS
+certificate chains
+reverse proxies
+CDN TLS termination
+
+** TLS Handshake **
+At a high-level TLS does 3 things. Provide authentication, Always server, sometimes client. Key exchange: securely agreeing on shared secrets and Encryption setup: deriving shared keys for
+symmetric encryption during communication.
+
+** Important Terminology **
+SNI (Server Name Indication) - Specifies to a server which hostname is it attempting to reach, this is important for servers that serve several different hosts on the same IP such as CDNs.
+ALPN (Application Layer Protocol Negotiation) - Allows clients and servers to negotiate which version of HTTP to utilise
+
+
+** The process of a TLS handshake **
+
+1. Client Hello
+This is the next packet after the ACK packet, or sometimes combined as ACK + Client Hello.
+
+It informs the server what:
+- Supported TLS Versions
+- Supported Ciphers
+- Random Nonce (Client Random)
+
+2. Server Hello
+- Chosen TLS version
+- Chosen Cipher
+- ServerRandom
+- SessionID (optional)
+
+The cipher suite defines everything. Example
+
+TLS_ECDHE_RSA_WITH_AES256_GCM_SHA384
+
+ECDHE - Cipher Curve
+RSA - Authentication 
+AES256-GCM - Encryption Method
+SHA384 - Integrity
+
+3. Server Certificate
+X.509 Certificate Chain
+Public key
+CA Signature Chain
+4. Client Certificate (mTLS | MutualTLS)
+5. Key Exchange
+6. Key Derivation
+7. Finished Messages
+
+** Server Name Indication (SNI) **
+This signifys to a server which service is trying to be accessed during a TLS handshake, indicating which certificate to present.
+I want the IP for THIS domain, but I want the certificate for service A on THIS domain.
+
+** Application Layer Protocol Negotiation (ALPN) **
+Another field part of the TLS handshake. It is used to negotiation what HTTP version to utilise during communication. The most common types are
+HTTP/1.1, h2 (HTTP/2) and h3 (HTTP/3)
+
+** Online Certificate Status Protocol (OCSP) **
+
