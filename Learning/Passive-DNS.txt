@@ -1,0 +1,76 @@
+2. Passive DNS Providers
+
+Historical and current DNS records.
+
+Resource        Purpose
+SecurityTrails  Passive DNS
+RiskIQ / PassiveTotal   Historical DNS
+DNSDB (Farsight)        Passive DNS
+AlienVault OTX  Threat intel + DNS
+CIRCL Passive DNS       Historical DNS
+VirusTotal      DNS + cert intel
+PassiveTotal    Infrastructure correlation
+DNSDumpster     Passive recon
+Robtex  DNS intelligence
+ThreatCrowd     Threat DNS
+ThreatMiner     IOC infrastructure
+Bufferover      Passive DNS
+Anubis  DNS intelligence
+URLScan Indexed URLs/domains
+HackerTarget    DNS/host intel
+Netlas  Internet intelligence
+
+Passive DNS (pDNS) is a system that maps historical data of IP address - Domain mappings. This system doesn not generate DNS queries, rather monitors them being created. It is utilised to see
+how infrastructure may have changed within an organisation, including revealing stale endpoints that are no longer maintained.
+This data is captured by pDNS sensors (cameras inside of a library of DNS queries) that run on recursive resolvers (the place between authoritative name servers and caching servers) these systems
+take clients queries and resolve them to IP addresses by accessing their own cachce or communicating with authoritative NSs.
+
+It is possible to run your own pDNS sensor and recursive resolver, many people do for security, experimentation, learning DNS and filtering however the dataset for your pDNS will only be the 
+requests that your client makes in-turn providing very little recon.
+
+Considering many internal services will not be accessible publicly, and are resolved by internal name servers. pDNS provides a mapping of public facing infrastrucutre, however does not reveal
+internal or private infrastructure.
+
+Zone Files are publicly available text files that list all domains (not subdomains) mapped to a TLD. These provide you with a domain and their authoritative name servers, it can be useful for spotting
+all domains under a TLD, related domains or typosquats.
+
+-- Server Name Indication --
+This is important when testing historical infrasturucture, specifically old CDN providers. it allows you to specify what hostname to reach behind a CDN.
+example usage: curl --resolve domain:port:ip \
+	 	https://hostname.comnmap
+
+== Live DNS vs Historical DNS ==
+Live DNS are current infrastructural mappings of Domain <-> IP address. These can be obtained utilising NSLOOKUP or dig.
+
+Historical DNS are ones that been seen by pDNS sensors in the past, they do not necasserily map to live servers however can provide insite into infrastructural changes.
+
+-- Practice Exercise [hackerone.com] --
+Current Infra
+*.hackerone.com - 104.18.36.214 & 172.64.151.42
+
+First Time Current Infra Appeared
+2024-02-24 -> 2024-05-30 104.18.36.214 (This tells us that on 2024/02/24 the organisation may have migrated infrastructure to this new ip.)
+2024-02-24 -> 2024-05-30 172.64.151.42
+
+pDNS Analysis hackerone.com
+2026+			8.6.112.0 (ONLY APPEARED FOR 3 DAYS THEN DISSAPEARED!!)
+			8.47.69.0
+
+2024/08+		104.18.16-17.177
+	
+2024/02 - Present	104.18.36.214 & 172.64.151.42
+2024/06 - 2024/07	188.114.98-99.224
+
+2022/03			188.114.97.128 (appeared for 1 day, then never again)
+
+2015/12 - 2024/02	104.16.99-100.52
+
+-- DOMAIN <-> IP MAPPINGS --
+support.hackerone.com | 172.66.0.145	162.159.140.147
+docs,api,www.hackerone.com | 104.18.36.214 172.64.151.42
+mta-sts.hackerone.com | CNAM hacker0x01.github.io IP 185.199.108-111.153
+
+TIMELINE
+
+hackerone.com, www., api.  | Doesnt appear on VT  				DOESNT APPEAR ON VT, dig returns a.root-server 		Appears on the same day as the A record search with domain:tabnaak.com
+2015/12			     188.114.97.128 (DOES BUT NOT FOR HACKERONE)	188.114.98-99.224 (ClOUDFLARE)				8.6.112.0 (doesnt seem to add up)
