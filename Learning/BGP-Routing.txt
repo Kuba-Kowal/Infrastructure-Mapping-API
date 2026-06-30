@@ -1,0 +1,76 @@
+== Prefixes ==
+A prefix is simply a block of IP addresses. the /x e.g. /24 is known as a prefix length.
+
+Modern networking utilises CIDR (Classless inter-domain routing) in the format
+	IP/Prefix-Length
+
+-- Longest Prefix Match --
+Routers almost always choose the most specific route. Backbone routers typically hold large routing tables containing network identifiers.
+
+For example
+
+Router A	10.0.0.0
+Router B	10.10.0.0
+Router C	10.10.10.0
+
+Destination	10.10.10.5
+
+Router C selected.
+
+This concept is important for several applications.
+Lets say you see an origin server with ip 203.0.113.14/24.
+an ASN announces 203.0.113.0/24  you now know that, this organisation has a public IP address range of 203.0.113.0-255/24 (potentially)
+
+you later find that another ASN announces 203.0.113.128/25. This also tells you that they have split their public IPs into 2 subnets. for uses such as:
+	load balancing
+	DDoS Mitigation
+	Cloud Migration
+	Anycast etc.
+
+== Route Advertisements ==
+Route advertisements are performed by edge routers (routers configured to communicate with other ASes). These advertisements are communciated between ASes and inform other ASes
+of a potential route to reach the designated prefix (there can be several different routes). The AS then communicates with its internal routers to reach this advertised "next_hop".
+once the next_hop has been reached this process is repeated.
+
+== Peering ==
+Two ASes exchanging advertisement information between each other. typically supported by policies that favour these ASes routes over other advertisements. primarily for free, usually designed
+to support these companies.
+
+== Transit ==
+Similar to peering, however rather than only sharing their clients BGP advertisements. They share all accessible routes. Essentially acting as a middleman / proxy for these ASes.
+
+Small ISP -- (transit) --> Regional ISP -- (transit) --> Large Carrier --> Internet
+
+== Route Selection ==
+Route selection is based on several factors, for cisco specific devices it typically begins with weight (local routes) 35k+ and learnt routes at 0. the higher the weight the higher its priority 
+when forwarding traffic
+
+After this comes LOCAL_PREF. these are locally configured preferences typically setup to follow the order of e.g.
+	200	Customer
+	150	Peer
+	100	Provider
+
+AS_PATH comes after this - the most commonly referred to path selection. This is received from advertisements, AS400 AS300 will be preffered over AS100 AS200 AS300 as len 2 < 3.
+
+== BGP Hijacks ==
+This is a process where an adversarie makes malicious BGP advertisements, with potentially shorter routes or more specific prefixes. Other ASes then propogate them causing the attacker to receive the
+traffic. This can be used for denial of service or MitM
+
+== Resource Public Key Infrastructure ==
+As BGP was designed with working together in mind, and not for adversaries no system was put in place to prevent BGP hijacking. RPKI was introduced to prevent this by. distributed repositories store
+route origin authorisation (ROA) distributed by regional IP holders - these inform routers which ASes are allowed to advertise what prefixes via RPKI validators which are external services
+that hold these repositories alongside their corresponding cryptographic verification keys.
+
+== Anycast ==
+Is the process of mapping 1 prefix to several servers. This allows one organisation to route traffic to the closest / fastest services. For example google DNS may have several servers all on 8.8.8.8
+Howevery ou may have several routes advertised ASN100 ASN200 | ASN500 ASN400 ASN800 | ASN900 ASN450 ASN550 ASN650. It will pick the first one (london) due to the shortest AS_PATH.
+
+== Important Tools ==
+whois
+bgp.he.net
+RIPEstat
+ipinfo
+traceroute
+mtr
+route collectors
+looking glasses
