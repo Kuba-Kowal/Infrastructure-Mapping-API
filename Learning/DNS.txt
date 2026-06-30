@@ -1,0 +1,103 @@
+** What is DNS **
+DNS or Domain Name System is a colletion of several different systems
+	- Recurssive DNS / Caching DNS
+	- TLD DNS
+	- Authoritative DNS
+	- Root DNS
+That resolve domain names to their appropriate IPs. They can also store additional pieces of information.
+
+** Types of DNS records **
+A Record	- IPv4 to Domain mapping
+AAAA Record	- IPv6 to Domain Mapping
+MX Record	- Maps a domain to its appropriate mail server
+SOA Record	- Start of authority, provides administrative information about a domain such as TTLs, as well as the zone apex (the domain to which CNAMES reside under)
+TXT Record	- Text record that provides additional information such as domain ownership verification, mail trust boundaries or public key storage
+CNAME Record	- Points a DNS record to another domains rather than directly to an IP. api.example.com -> example.com -> IPv4
+NS Record	- A set of information utilised by TLD DNS servers to direct queries to the correct authoritative name server. Lack of NS records resloves an NXDOMAIN response.
+
+** DNS Query FLow **
+1. Recurssive DNS, performs DNS queries on behalf of the client alongside caching for faster retrieval in the future. This is where pDNS sesnors live for storage of historical DNS.
+2. Root DNS, Points your query to the appropriate TLD DNS server. I dont know where example.com server is, but I know where the .com TLD server is.
+3. TLD DNS, Points queries to the respective authoritative DNS server for the domain utilising the TLD specified.
+4. Authoritative DNS, This is where majority of DNS records are actually stored
+
+** DNS Zones & Domain Namespaces **
+A domain namespace is a way that domains are organised so that there are no duplicate domains as well as provides structure for faster querying. A hierarchal model allowing delegation and
+resource allocation across multiple levels.
+
+A DNS zone is an area of this domain namespace managed as a single administrative unit. Any domain or group of domains operated by a single organisation is a DNS zone. .com and .net branches of the
+domain namespace are referred to as TLD DNS Zones. Subdomains can part of their own DNS zone, however only if delegated via the use of an NS record.
+
+These NS records are how DNS zones are defined.
+
+** Glue Records **
+Glue records are information stored within a parent DNS zone designed to prevent circular dependancy. It is an A/AAAA record that stores the IPs of child zone DNS zones delegated within NS records.
+
+For example the Root DNS Zone may store an NS record for .com as a.comtldserver.com. To reach this server it needs to know its IP. therefore insead of creating another DNS query, it instead looks
+at its glue records for an A/AAAA a.comtldserver.com 192.x.x.x thus not requiring a second DNS query (a circular dependancy) to resolve this child zones layer 3 information.
+
+;; ANSWER SECTION:
+website.		86400   IN      NS      zara.ns.cloudflare.com.  (The parent zone (.com) NS delegation for the child zone (authoritative name server) storing this domains zone.
+website.	        86400   IN      NS      garret.ns.cloudflare.com.
+
+;; ADDITIONAL SECTION:
+zara.ns.cloudflare.com. 85279   IN      A       108.162.192.148          (The glue record associated with the NS reference for the domains zone.)
+zara.ns.cloudflare.com. 85279   IN      A       172.64.32.148
+zara.ns.cloudflare.com. 85279   IN      A       173.245.58.148
+
+** Zone Transfers **
+The process of authoritative name servers copying or transferring its complete contents from one server to another to ensure all authoritative name servers posses the same data.
+A single domain typically has multiple name servers storing its zone data. All name servers must contain the same data about this domain to ensure integrity. This process typically has a server
+acting as the "source of truth" from which other name server replicate from it.
+
+There are 2 types of zone transfers.
+- AXFR (full zone transfer)
+A complete copy of a DNS zone (example.com). If there are no seperate NS records for subdomains, this data is also transferred. this is typical for full rebuild or initial synchronisation.
+- IXFR (incremental zone transfer)
+The idea behind these is similar to incremental file backups. Where only changes from the last sync are transferred between zones on any level, root, TLD, domain and subdomain.
+
+
+** Split-horizon DNS **
+This is also known as split-brain DNS. It is a system that allows several different DNS records to be stored under a single domain.
+These DNS result received from a DNS query within a split-horizon DNS system depends on any of the following:
+- Source IP
+- Network Locations (A DNS server maps IP ranges to network locations)
+- ACLs
+- VPN presence
+- Internal vs External Resolvers
+
+** DNSSEC **
+DNS Security Extension is a method of verifying integrity and authenticity for responses of DNS queries, preventing MitM and DNS spoofing attacks.
+It utilises a hierarchal chain of trust, providing integrity and every step of a DNS query including verification by the recurssive resolver at every single level of the query through 
+the use of signed data with each zones response.
+
+
+** CNAME Chains **
+This allows chaining of up to 8-10 domains. Rather than a domain resolving directly to an IP, it instead points to another domain which is then required potentially adding latency.
+
+
+** Reverse DNS **
+A DNS delegation structure with its own DNS zones: in-addr.arpa and ip6.arpa.
+reverse DNS stores PTR records (Pointer Record), unlike traditional DNS: Domain -> multiple IPs. reverse DNS: 1 IP -> 1 Domain (NXDOMAIN often for CDNs)
+
+** Wildcard Behaviour **
+A wildcard DNS maps all subdomains under a domain to a single DNS resolution. the apex domain is not included inside of a wildmask DNS. Explicit DNS records hold priority over
+wildcard DNS records. Wildcard DNS can result in subdomain enumeration tools providing many false-positives. the wya arouond this is to utilise a tool that checks whether these domains resolve to
+the same IP address.
+
+** Resolver Caching **
+This is the process where recurssive resolvers store DNS resolutions from each zone in a cache. Every query resolution comes with a TTL field. This field tells the resolver how long to cache
+a query to lower the amount of authoritative name server queries. 
+There are two types of caching: Positive and negative - positive caching stores successful queries, while negative ones like NXDOMAIN are also cached. RFC2308 defines the TTL for negative
+caching.
+
+** TTL Operational Implications **
+The TTL field signifies how often recurssive resolvers re-query a domain for its records. This can impact how long DNS poisoning lasts for. Low TTLs are great for epehemral subdomain enumeration
+as these temporary subdomains often don't last long.
+
+** DNS Loadbalancing **
+A technique where a single domain name maps to several IPs in a record. This allows loadbalancing by distributing clients across these servers providing performance and availability.
+
+** Subdomain Takeover **
+This is a very practical point for a pentester. It is when a CNAME record points to a domain that is no longer owned by anyone. This allows attackers to take over these CNAME domains and 
+host malicious content.
