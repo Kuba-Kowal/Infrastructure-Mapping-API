@@ -1,0 +1,41 @@
+CREATE DATABASE graph
+
+CREATE TABLE nodes(
+node_hash VARCHAR(64) PRIMARY KEY UNIQUE NOT NULL,
+type ENUM('FQDN', 'IP', 'ASN', 'ORG', 'DNS', 'CERT', 'PREFIX) NOT NULL,
+data VARCHAR(255),
+properties JSON
+)
+
+CREATE TABLE relationships(
+relationship_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL UNIQUE,
+source_hash VARCHAR(64) NOT NULL,
+target_hash VARCHAR(64) NOT NULL,
+relationship_type VARCHAR(255) NOT NULL,
+
+FOREIGN KEY (source_hash) REFERENCES nodes(node_hash),
+FOREIGN KEY (target_hash) REFERENCES nodes(node_hash)
+)
+
+CREATE TABLE scans(
+scan_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL UNIQUE,
+apex_domain VARCHAR(255) NOT NULL,
+started_at DATETIME NOT NULL,
+finished_at DATETIME NOT NULL
+)
+
+CREATE TABLE scan_relationships(
+scan_id INT NOT NULL,
+relationship_id INT NOT NULL,
+
+FOREIGN KEY (scan_id) REFERENCES scans(scan_id),
+FOREIGN KEY (relationship_id) REFERENCES relationships(relationship_id)
+)
+
+# NOW FOR US TO MAKE THE PROGRAM CHECK FOR DUPLICATES. WE MUST CREATE A COMPOSITE KEY.
+# THIS STOPS THE PROGRAM FROM INSERTING DUPLICATE DATA, THAT DOESNT APPEAR DUPLICATE BECAUSE 
+# THE PRIMARY KEY HAS INCREMENTED
+
+ALTER TABLE relationships
+ADD CONSTRAINT unique_relationship_pair
+UNIQUE (source_hash, target_hash, relationship_type)
