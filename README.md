@@ -15,9 +15,11 @@ Asynchronous Fetching Layer
 		↓
 Scope Expansion Layer
 		↓
-Processing Layer (Normalisation + Deduplication + Graph Store)
+Processing Layer (Normalisation + Deduplication + Internal Graph Store)
 		↓
-Export Layer (JSON Normalisation)
+Persistence Layer (Serialisation + MySQL Graph Store)
+		↓
+Optional Export Layer (JSON Normalisation)
 ```
 
 **Usage**
