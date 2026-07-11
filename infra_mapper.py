@@ -3,6 +3,7 @@ from pipelines.virustotal_pipeline import virustotal_pipeline
 from pipelines.crtsh_pipeline import crtsh_pipeline
 from pipelines.certspotter_pipeline import certspotter_pipeline
 from pipelines.cymru_pipeline import cymru_pipeline
+from pipelines.persistence_pipeline import persistence_pipeline
 from core.graph import Graph
 from core.models import *
 from core.configuration import create_config
@@ -16,9 +17,11 @@ graph = Graph()
 async def main(input_data, config):
     try:
         for domain in input_data:
+            if graph.apex_domain == "":
+                graph.apex_domain = graph.extract_apex(domain)
             graph.add_node(FQDN(domain))
 
-        start = time.perf_counter()
+        start_scan = time.perf_counter()
 
         async with asyncio.TaskGroup() as tg:
             print("\n-- [+] BEGIN PASSIVE RECON --\n")
@@ -42,11 +45,14 @@ async def main(input_data, config):
         print("\n-- [+] BEGIN BGP RECON --\n")
         cymru_pipeline(graph)
 
-        end = time.perf_counter()
+        end_scan = time.perf_counter()
 
-        write_to_json(graph, config)
+        if config["output"] != None:
+            write_to_json(graph, config)
 
-        print(f"\n\n\n\nTotal runtime: {end - start:.2f} seconds\n\n\n\n")
+        print(f"\n\n\n\nTotal Scan Time: {end_scan - start_scan:.2f} seconds\n\n")
+
+        persistence_pipeline(graph, start_scan)
 
     except asyncio.CancelledError:
         print("\nExiting.")
