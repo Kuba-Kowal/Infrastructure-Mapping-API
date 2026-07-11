@@ -60,7 +60,7 @@ options:
 
 **Entity Relationship Diagram**
 
-![Entity Relationship Diagram](images/ERD.png)
+![Entity Relationship Diagram](Images/ERD.png)
 
 - Scans table for historical tracking, provides a vector for grouping relationships from seperate scans, newly discovered relationships can be easily tracked.
 - Junction table to facilitate many-to-many between scans and relationship
