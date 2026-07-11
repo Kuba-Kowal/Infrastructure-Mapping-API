@@ -58,8 +58,14 @@ options:
 - Database: Store results with dates to convert from data ingestion to data monitoring.
 - Potential for AI result result inference such as automated infrastructure / operational clustering or confidence assignment based on shared ASN / DNS / CT relationships
 
-**Entity Relationships**
+**Entity Relationship Diagram**
 
+![Entity Relationship Diagram](images/ERD.png)
+
+- Scans table for historical tracking, provides a vector for grouping relationships from seperate scans, newly discovered relationships can be easily tracked.
+- Junction table to facilitate many-to-many between scans and relationship
+- Nodes table utilises `node_hash` as its PK for guaranteed, uniqueness without the requirement of a constraint, and reduced writing operations saving on API run time.
+  
 ---
 
 # Engineering Decisions & Trade-offs
@@ -83,8 +89,8 @@ options:
 > **Trade-off: SQLite vs MySQL vs PostgreSQL**
 > 
 > This decision was mainly influenced by industry standards, I selected MySQL due to it being the most used, with the idea of transitioning to a neo4j solution for graph analysis while utilising MySQL for historical data persistence. I chose not to utilise
-> sqlite despite its portability as I wanted a more robust solution that is scalable. While the portability of a single file is nice, the idea for this project is to store millions of records, which would most likely come with performance degredation over time
-> if I utilised SQLite.
+sqlite despite its portability as I wanted a more robust solution that is scalable. While the portability of a single file is nice, the idea for this project is to store millions of records, which would most likely come with performance degredation over time
+if I utilised SQLite.
 
 ---
 # Example Output
@@ -104,6 +110,8 @@ options:
 
 Total runtime: 155.85 seconds
 
+Total Database Write Time: 0.12 seconds
+
 -> ./hackerone.json
 ```
 
@@ -112,6 +120,9 @@ Total runtime: 155.85 seconds
 ```
 aiohttp==3.14.1
 dnspython==2.8.0
+mysql_connector_repackaged==0.3.1
 python-dotenv==1.2.2
+Requests==2.34.2
+tldextract==5.3.1
 ```
 
