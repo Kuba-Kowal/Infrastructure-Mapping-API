@@ -58,6 +58,8 @@ options:
 - Database: Store results with dates to convert from data ingestion to data monitoring.
 - Potential for AI result result inference such as automated infrastructure / operational clustering or confidence assignment based on shared ASN / DNS / CT relationships
 
+**Entity Relationships**
+
 ---
 
 # Engineering Decisions & Trade-offs
@@ -77,6 +79,12 @@ options:
 > **Trade-off: Synchronous vs Asynchronous Fetching**
 > 
 > Synchronous orchestration results in higher stability, with ~10% higher connection success rates to unstable APIs (crt.sh) at the cost of speed ~30-45% slower. Hybrid asynchronous fetching allowed me to maintain the stability of DNS and BGP (TXT records) fetching due to its already fast, and typically larger ingestion size. While substantially increasing the speed of pDNS + CT log reconnaissance. I am happy to lose connection success rate, due to the usage of several sources and a fail-safe in case the first connection fails and the scope is not expanded.
+
+> **Trade-off: SQLite vs MySQL vs PostgreSQL**
+> 
+> This decision was mainly influenced by industry standards, I selected MySQL due to it being the most used, with the idea of transitioning to a neo4j solution for graph analysis while utilising MySQL for historical data persistence. I chose not to utilise
+> sqlite despite its portability as I wanted a more robust solution that is scalable. While the portability of a single file is nice, the idea for this project is to store millions of records, which would most likely come with performance degredation over time
+> if I utilised SQLite.
 
 ---
 # Example Output
