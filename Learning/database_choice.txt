@@ -1,0 +1,72 @@
+https://www.youtube.com/watch?v=moqhSZM2BFo&t=3s - Postgres vs MySQL vs SQLite - a developer's guide
+https://www.youtube.com/watch?v=btjBNKP49Rk - PostgreSQL vs MySQL IBM.
+https://www.youtube.com/watch?v=DQdB7wFEygo&t=175s - The only docker tutorial you need to get started
+https://www.youtube.com/watch?v=t779DVjCKCs - Docker Image BEST Practices - From 1.2GB to 10MB
+https://www.youtube.com/watch?v=HzB4Rzi7CPs - Run MySQL in Docker in 5 Minutes (the easy way) 
+https://www.youtube.com/watch?v=oPV2sjMG53U&list=PLZPZq0r_RZOMskz6MdsMOgxzheIyjo-BZ - MYSQL tutorial for beginners
+
+https://dbeaver.io/ DBMS
+
+We only work with non-relational datastores realistically
+
+We have 3 nice options
+- PostgreSQL
+- MySQL (MariaDB)
+- SQLite (Just a file)
+
+How do decide what database to utilise:
+- Do we have an expert?
+- Do we need something specific
+    - Postgres extenstion
+    - SQLite portability
+
+- Am i going to operate the DB myself, or outsource to cloud.
+    - MySQL is simpler (for self ownership)
+    - Operator experience (60% of sites use MySQL)
+
+
+**SQLite**
+@aristideau5072
+"SQlite's date type is very primitive and requires a heap of extra work when manipulation dates and time. 
+And it does not support user defined functions so you cannot even write your own date handling functions to get over SQlite's lack of native date / time functions so thatalone would remove it from my DB short list"
+
+**Scalability**
+- SQlite [500k users / 10,000 concurrent] Single File.
+- MySQL / Postgres [Practically Infinite] (if you know how to shard, essentially partitioning. effective code doesnt require accessing several shards)
+
+Overall im going to choose to utilise MySQL, mainly because from what I have heard is it is one of the most use, if not the most used database type. Is is also the most versatile, meaning it
+can be applied to every project, SQLite may be a better option for some, however I would also like the experience of working wit ha db server
+
+When it comes to the design, I think for now I will simply extend my current model by implementing a properties section for nodes, and instead of having a different type of node object, for every single node. I can now 
+store them as a single node entity, with the node_type field.
+
+**DOCKER**
+a dockerfile is essentially like a recipe, inside the file is a list of instructions to run a docker container.
+
+docker scout scans for vulnerabilities within packages
+
+docker compose is utilised for multi container applications
+
+docker volume is designed to store data and share it between containers
+
+docker build cloud, allows builds to be 39x faster? do we really want this, i dont know.
+
+
+I want to implement observations, which are inferences with confidence that state something about edges. This appeared in several sources, several times high confidence, this appeared once, one time, with a 
+low-value fqdn. low confidence.
+
+the next issue that is faced is how to return all results for a domain, including its CNAMEs which may not necessarily include the original name. Well now I think we introduce a new field called, origin search
+within nodes. However this will mean that if a user re-quries another domain that has the same apex domain, it will not return to the origin search.
+
+Now duplication is not an issue as origin serach is not included in the hash calculation. However it may be a good idea to make the origin search the apex of the domain, therefore no matter what subdomain a user 
+searches for, it will provide us with all the data.
+
+Lets say a user instead searches for a cname. well that now has a different apex zone. However I don't believe as that is as much of an issue as, this will still provide the correct results when the CNAMEs are not
+cloud hosted. If they are cloud hosted its a pretty low confidence signal anyway.
+
+
+However, now that i am using database IDs for referencing rather than hashes, I may need to seperate writing nodes, writing edges and writing observations to the database. As the new ids will have to be fetched.
+
+** DBMS **
+Database management systems are for interacting with sql databases. Once you learn one DBMS (MySQL) its very easy to transition to any other DBMS
+
