@@ -23,7 +23,7 @@ def parse_args():
         description="CT Log, pDNS, DNS graph orchestration tool"
     )
     parser.add_argument("-d", "--domains", nargs="+", metavar="DOMAIN", help="One or more domains to enumerate", required=True)
-    parser.add_argument("-o", "--output", help="Write results to JSON file, default [./graph.json]")
+    parser.add_argument("-o", "--output", help="Write results to JSON file, default [./graph.json]", required=False)
 
     return parser.parse_args()
 
