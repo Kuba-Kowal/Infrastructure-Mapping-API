@@ -13,6 +13,6 @@ def process_cymru_metadata(data: Answer, asn: str, graph: Graph) -> None:
 
             graph.add_node(org_object)
             
-            graph.add_edge(AStoOrganisation(generate_hash(asn_object), generate_hash(org_object), Source.CYMRU))
+            graph.asn_to_org.add(AStoOrganisation(generate_hash(asn_object), generate_hash(org_object), Source.CYMRU))
 
     

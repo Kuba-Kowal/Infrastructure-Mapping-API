@@ -16,7 +16,7 @@ async def certspotter_pipeline(graph: Graph) -> None:
 
         # Seeding - create first group of tasks based on input graph
         for fqdn in graph.fqdns.values():
-            domain = fqdn.domain
+            domain = fqdn.data
 
             seen.add(domain)
 

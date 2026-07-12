@@ -28,6 +28,8 @@ async def fetch_virustotal(domain: str, sem: aiohttp.Semaphore, session: aiohttp
                 
         except asyncio.TimeoutError:
             continue
+        except aiohttp.ClientConnectorDNSError:
+            continue
 
     print(f"[-] FAILED - MAX RETRIES | VIRUSTOTAL | {domain}")
     return {}

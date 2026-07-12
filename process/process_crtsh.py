@@ -33,7 +33,14 @@ def process_crtsh(crt_sh_data: list[dict[str, str]], graph: Graph) -> None:
             not_after = None
 
         # Create certificate object utilising these fields
-        cert_object = Certificate(str(certificate['id']), issuer, not_before, not_after)
+        cert_id = str(certificate["id"])
+
+        cert_object = Certificate(cert_id, {
+            "issuer": issuer,
+            "not_before": not_before,
+            "not_after": not_after
+        })
+        
         graph.add_node(cert_object)
 
         # Create FQDN object based on SANs
@@ -44,4 +51,4 @@ def process_crtsh(crt_sh_data: list[dict[str, str]], graph: Graph) -> None:
                 graph.fqdns.add(fqdn_object)
 
             # Create FQDN <-> Certificate Mapping Object
-            graph.add_edge(CerttoFQDN(generate_hash(cert_object), generate_hash(fqdn_object), Source.CRT_SH))
+            graph.cert_to_fqdn.add(CerttoFQDN(generate_hash(cert_object), generate_hash(fqdn_object), Source.CRT_SH))

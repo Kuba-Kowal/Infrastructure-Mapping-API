@@ -30,7 +30,14 @@ def process_certspotter(cert_spotter_data: list[dict[str, str]], graph: Graph) -
             not_after = None
 
         # Create certificate object utilising these fields
-        cert_object = Certificate(str(certificate['id']), issuer, not_before, not_after)
+        cert_id = str(certificate["id"])
+
+        cert_object = Certificate(cert_id, {
+            "issuer": issuer,
+            "not_before": not_before,
+            "not_after": not_after
+        })
+
         graph.add_node(cert_object)
 
         # Create FQDN object based on SANs
@@ -42,4 +49,4 @@ def process_certspotter(cert_spotter_data: list[dict[str, str]], graph: Graph) -
                     graph.add_node(fqdn_object)
 
                 # Create FQDN <-> Certificate Mapping Object
-                graph.add_edge(CerttoFQDN(generate_hash(cert_object), generate_hash(fqdn_object), Source.CERT_SPOTTER))
+                graph.cert_to_fqdn.add(CerttoFQDN(generate_hash(cert_object), generate_hash(fqdn_object), Source.CERT_SPOTTER))

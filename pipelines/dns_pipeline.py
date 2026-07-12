@@ -2,6 +2,8 @@ from core.queue import *
 from fetch.fetch_dns import resolve_dns_query
 from expand.expand_cname import expand_cname
 from process.process_dns import process_dns
+from collections import defaultdict
+import asyncio
 
 DNS_RECORD_TYPES = (
     "A", 
@@ -13,25 +15,47 @@ DNS_RECORD_TYPES = (
     "SRV"
 )
 
-def dns_pipeline(graph: Graph) -> None:
-    queue = Queue(deque(graph.get_domains()), set())
+def seed_dns_tasks(domain, tasks):
+    for rtype in DNS_RECORD_TYPES:
+        task = asyncio.create_task(resolve_dns_query(domain, rtype))
+        tasks[task] = (domain, rtype)
 
-    while len(queue.queue):
-        domain = queue.next_item_in_queue()
+async def dns_pipeline(graph: Graph) -> None:
+    queue = graph.get_domains()
+    tasks = {}
+    dns_records = defaultdict(dict) # The missing value for any dictionary is a dictionary.
 
+    for domain in queue:
         if domain.startswith("*"):
             continue
+        seed_dns_tasks(domain, tasks)
 
-        dns_answer = resolve_dns_query(domain, "CNAME")
+    while tasks:
+        done, _ = await asyncio.wait(
+            tasks.keys(),
+            return_when=asyncio.FIRST_COMPLETED
+        )
 
-        if dns_answer:
-            process_dns(dns_answer, "CNAME", domain, graph)
+        for task in done:
+            domain, rtype = tasks.pop(task) # we pop the task, before we await it incase an exception is raised, and the task stays inside the dictionary.
 
-            new_domain = expand_cname(dns_answer)
-            queue.add_to_queue([new_domain])
+            raw_data = await task
 
-        for rtype in DNS_RECORD_TYPES:
-            dns_answer = resolve_dns_query(domain, rtype)
+            if not raw_data:
+                continue
 
-            if dns_answer:
-                process_dns(dns_answer, rtype, domain, graph)
+            if rtype == "CNAME":
+                for record in raw_data:
+                    domain = record.removesuffix(".")
+
+                    if domain.startswith("*"):
+                        continue
+
+                    seed_dns_tasks(domain, tasks)
+
+                    dns_records[domain][rtype] = raw_data
+
+            else:
+                dns_records[domain][rtype] = raw_data
+
+    process_dns(dns_records, graph)

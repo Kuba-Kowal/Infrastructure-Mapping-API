@@ -14,13 +14,16 @@ def process_virustotal(vt_data: list[dict[str, str]], domain: str, graph: Graph)
                 ip_addr = ip['ip_address']
             else:
                 ip_addr = ""
-            if ip.get('last_resolved') is not None:
+
+            """
+            if ip.get('last_resolved') is not None:     UNUSED LOGIC, grabs the last resolved time.
                 last_observed = ip['last_resolved']
             else:
                 last_observed = "unkown"
+            """
 
             ip_object = IPAddress(ip_addr)
             graph.add_node(ip_object)
 
             # Create FQDN to pDNS Relationship Object
-            graph.add_edge(FQDNtoPassiveDNS(generate_hash(fqdn_object), generate_hash(ip_object), last_observed, Source.VIRUSTOTAL))
+            graph.fqdn_to_pdns.add(FQDNtoPassiveDNS(generate_hash(fqdn_object), generate_hash(ip_object), Source.VIRUSTOTAL))

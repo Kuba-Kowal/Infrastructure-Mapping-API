@@ -8,37 +8,50 @@ class Source(str):
     CYMRU = "cymru"
     VIRUSTOTAL = "virustotal"
 
+from dataclasses import dataclass
+# ----------------------------
+# Data models - Raw
+# ----------------------------
+class Source(str):
+    CRT_SH = "crt.sh"
+    CERT_SPOTTER = "certspotter"
+    CYMRU = "cymru"
+    VIRUSTOTAL = "virustotal"
+
 @dataclass(frozen=True, slots=True)
 class Certificate:
-    id: str
+    data: str # Certificate id
+    properties: dict[str, Any]
+    """
     issuer: str
     not_before: date
     not_after: date
+    """
 
 @dataclass(frozen=True, slots=True)
 class FQDN:
-    domain: str
+    data: str
 
 @dataclass(frozen=True, slots=True)
 class IPAddress:
-    ip: str
+    data: str
 
 @dataclass(frozen=True, slots=True)
 class ASN:
-    as_number: int
+    data: int
 
 @dataclass(frozen=True, slots=True)
 class Prefix:
-    prefix: str
+    data: str
 
 @dataclass(frozen=True, slots=True)
 class Organisation:
-    organisation: str
+    data: str
 
 @dataclass(frozen=True, slots=True)
 class DNSRecord:
-    type: str
     data: list[str]
+    properties: str
 
 # ----------------------------
 # Data models - Relational
@@ -46,37 +59,36 @@ class DNSRecord:
 
 @dataclass(frozen=True, slots=True)
 class CerttoFQDN:
-    certificate: Certificate
-    fqdn: FQDN
-    observed_at: Soure
+    source_data: str
+    target_data: str
+    observed_at: Source
 
 @dataclass(frozen=True, slots=True)
 class IPtoPrefix:
-    ip: IPAddress
-    prefix: Prefix
+    source_data: str
+    target_data: str
     observed_at: Source
 
 @dataclass(frozen=True, slots=True)
 class PrefixtoASN:
-    prefix: Prefix
-    asn: ASN
+    source_data: str
+    target_data: str
     observed_at: Source
 
 @dataclass(frozen=True, slots=True)
 class AStoOrganisation:
-    asn: ASN
-    organisation: Organisation
+    source_data: str
+    target_data: str
     observed_at: Source
 
 @dataclass(frozen=True, slots=True)
 class FQDNtoDNS:
-    domain: FQDN
-    record: DNSRecord
+    source_data: str
+    target_data: str
     observed_at: Source
 
 @dataclass(frozen=True, slots=True)
 class FQDNtoPassiveDNS:
-    fqdn: FQDN
-    ip: IPAddress
-    last_observed: ip['last_resolved']
+    source_data: str
+    target_data: str
     observed_at: Source

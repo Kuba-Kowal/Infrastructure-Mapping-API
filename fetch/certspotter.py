@@ -31,6 +31,8 @@ async def fetch_certspotter(domain: str, sem: aiohttp.Semaphore, session: aiohtt
                 
         except asyncio.TimeoutError:
             continue
+        except aiohttp.ClientConnectorDNSError:
+            continue
 
     print(f"[-] FAILED - MAX RETRIES | CERTSPOTTER | {domain}")
     return []

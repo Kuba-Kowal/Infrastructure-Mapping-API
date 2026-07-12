@@ -1,9 +1,13 @@
-import dns.resolver
+import dns.asyncresolver
+import asyncio
 
-def resolve_dns_query(domain: str, rtype: str) -> dns.resolver.Answer | None:
+async def resolve_dns_query(domain: str, rtype: str) -> dns.resolver.Answer | None:
+    resolver = dns.asyncresolver.Resolver()
+
     print(f"[⋆] QUERY DNS - {rtype} | {domain}")
     try:
-        return [r.to_text() for r in dns.resolver.resolve(domain, rtype)]
+        result = await resolver.resolve(domain, rtype)
+        return [str(r) for r in result]
 
     except(
         dns.resolver.NXDOMAIN,

@@ -19,11 +19,20 @@ def process_cymru_origin(data: dict[str, str], ip: str, graph: Graph) -> None:
             if results:
                 ip_object = IPAddress(ip)
                 prefix_object = Prefix(prefix)
-                asn_object = ASN(asn)
 
                 graph.add_node(ip_object)
-                graph.add_node(asn_object)
                 graph.add_node(prefix_object)
 
-                graph.add_edge(IPtoPrefix(generate_hash(ip_object), generate_hash(prefix_object), Source.CYMRU))
-                graph.add_edge(PrefixtoASN(generate_hash(prefix_object), generate_hash(asn_object), Source.CYMRU))
+                graph.ip_to_prefix.add(IPtoPrefix(generate_hash(ip_object), generate_hash(prefix_object), Source.CYMRU))
+
+                if " " in asn:
+                    asns = asn.split(" ")
+                    for asn in asns:
+                        asn_object = ASN(asn)
+                        graph.add_node(asn_object)
+                        graph.prefix_to_asn.add(PrefixtoASN(generate_hash(prefix_object), generate_hash(asn_object), Source.CYMRU))
+
+                else:
+                    asn_object = ASN(asn)
+                    graph.add_node(asn_object)
+                    graph.prefix_to_asn.add(PrefixtoASN(generate_hash(prefix_object), generate_hash(asn_object), Source.CYMRU))

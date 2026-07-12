@@ -16,7 +16,7 @@ async def crtsh_pipeline(graph: Graph) -> None:
         tasks = {}
 
         for fqdn in graph.fqdns:
-            domain = fqdn.domain
+            domain = fqdn.data
 
             seen.add(domain)
 
