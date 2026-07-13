@@ -3,15 +3,13 @@ from persistence.writers.db_write_edge import write_edges
 from persistence.writers.db_write_scan_relationship import write_scan_relationship
 import time
 
-def persistence_pipeline(graph, start_scan):
+def persistence_pipeline(graph, scan_id, connection):
     start_write_db = time.perf_counter()
 
-    write_nodes(graph)
-    edge_ids = write_edges(graph)
+    write_nodes(graph, connection)
+    edge_ids = write_edges(graph, connection)
 
-    print(start_scan)
-
-    write_scan_relationship(graph, edge_ids, start_scan)
+    write_scan_relationship(graph, edge_ids, scan_id, connection)
 
     end_write_db = time.perf_counter()
 

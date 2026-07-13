@@ -1,9 +1,7 @@
-from core.queue import Queue
 from core.graph import Graph
 from fetch.crtsh import fetch_crtsh
 from expand.expand_crtsh import expand_crtsh
 from process.process_crtsh import process_crtsh
-from collections import deque
 import asyncio
 import aiohttp
 

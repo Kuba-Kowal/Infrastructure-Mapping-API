@@ -1,9 +1,7 @@
-from core.queue import Queue
 from core.graph import Graph
 from fetch.certspotter import fetch_certspotter
 from expand.expand_certspotter import expand_certspotter
 from process.process_cerspotter import process_certspotter
-from collections import deque
 import asyncio
 import aiohttp
 

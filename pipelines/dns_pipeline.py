@@ -1,4 +1,3 @@
-from core.queue import *
 from fetch.fetch_dns import resolve_dns_query
 from expand.expand_cname import expand_cname
 from process.process_dns import process_dns

@@ -2,10 +2,8 @@ from persistence.db.connection import *
 from persistence.mappers.node_mapper import map_nodes
 
 
-def write_nodes(graph: Graph) -> None:
+def write_nodes(graph: Graph, connection) -> None:
     try:
-        connection = get_connection()
-            
         cursor = connection.cursor()
 
         nodes = map_nodes(graph)

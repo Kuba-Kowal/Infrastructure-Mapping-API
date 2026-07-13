@@ -2,12 +2,10 @@ from persistence.db.connection import *
 from persistence.mappers.edge_mapper import map_edges
 
 
-def write_edges(graph: Graph) -> list[int]:
+def write_edges(graph: Graph, connection) -> list[int]:
     edges = map_edges(graph)
 
     try:
-        connection = get_connection()
-        
         cursor = connection.cursor()
 
         query = ("""

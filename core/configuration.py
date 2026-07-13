@@ -13,6 +13,7 @@ def load_config_file(path="config.json"):
         config["virustotal"] = False
     if not os.getenv("CERT_SPOTTER_API"):
         config["certspotter"] = False
+    config["output"] = None
 
     return config
 
@@ -30,7 +31,8 @@ def parse_args():
 def create_config():
     config = load_config_file()
 
+    return config
+"""
     for arg, value in vars(parse_args()).items():
         config[arg] = value
-
-    return config
+"""

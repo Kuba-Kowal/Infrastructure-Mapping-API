@@ -1,4 +1,3 @@
-from core.queue import *
 from expand.expand_virustotal import expand_virustotal
 from fetch.virustotal import fetch_virustotal
 from process.process_virustotal import process_virustotal

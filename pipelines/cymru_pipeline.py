@@ -1,4 +1,3 @@
-from core.queue import Queue
 from core.graph import Graph
 from fetch.cymru import fetch_origin_asn
 from fetch.cymru import fetch_asn_metadata
