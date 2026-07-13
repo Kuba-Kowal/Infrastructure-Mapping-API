@@ -70,10 +70,6 @@ options:
 
 # Engineering Decisions & Trade-offs
 
-> **Trade-off: Queue isolation vs global coordination**
-> 
-> A global queue introduced race conditions and missing entries due to concurrent mutation. I replaced this with isolated pipeline-level queues, improving the stability at the cost of missed, per-source data. I was happy to make this trade-off as the lost data is compensated through the use of several sources
-
 > **Trade-off: Hashing Strategy vs Sequential IDs**
 >
 > Selecting a referencing system for edges to reduce export dataset size: Hashing provided direct hashing tables without the requirement of reverse-lookup tables, although more complex, entries could be re-hashed rather than correlated to a table resulting in O(1) searches. Sequential IDs require reverse-lookups or O(n) searches.
@@ -84,13 +80,20 @@ options:
 
 > **Trade-off: Synchronous vs Asynchronous Fetching**
 > 
-> Synchronous orchestration results in higher stability, with ~10% higher connection success rates to unstable APIs (crt.sh) at the cost of speed ~30-45% slower. Hybrid asynchronous fetching allowed me to maintain the stability of DNS and BGP (TXT records) fetching due to its already fast, and typically larger ingestion size. While substantially increasing the speed of pDNS + CT log reconnaissance. I am happy to lose connection success rate, due to the usage of several sources and a fail-safe in case the first connection fails and the scope is not expanded.
+> Synchronous orchestration results in higher stability, with higher connection success rates to unstable APIs (crt.sh) at the cost of speed ~30-45% slower. Hybrid asynchronous fetching allowed me to maintain the stability of DNS and BGP (TXT records) fetching due to its already fast, and typically larger ingestion size. While substantially increasing the speed of pDNS + CT log reconnaissance. I am happy to lose connection success rate, due to the usage of several sources and a fail-safe in case the first connection fails and the scope is not expanded.
 
 > **Trade-off: SQLite vs MySQL vs PostgreSQL**
 > 
 > This decision was mainly influenced by industry standards, I selected MySQL due to it being the most used, with the idea of transitioning to a neo4j solution for graph analysis while utilising MySQL for historical data persistence. I chose not to utilise
-sqlite despite its portability as I wanted a more robust solution that is scalable. While the portability of a single file is nice, the idea for this project is to store millions of records, which would most likely come with performance degredation over time
-if I utilised SQLite.
+sqlite despite its portability as I wanted a more robust solution that is scalable. SQLite was avooided because the system is desinged around concurrent ingestion through future worker processes. A server based solutions provides more robus concurrency and better operational flexibility (management).
+
+> **Trade-off: Flask vs FastAPI vs NodeJS**
+> 
+> I opted to utilise FastAPI out of the above options: NodeJS although providing a common language between the front-end and the backend, A simple front-end will be sufficient javascriptlearning for now while providing me time to focus on a versatile python knowledge base. In relation to the Python frameworks - Django was also an option, however I believe it provides too many features, which would eliminate a lot of manual work (loss of learning). Although, flask is a more matured option with plenty of tutorials and additional libraries, FastAPI works well with my current program due to its inherrent asynchronous capabilities and more manual configuration approach.
+
+> **Trade-off: Dedicated Workers vs Subprocess vs Redis**
+>
+> I chose to opt for a bit of a hybrid model, dedicated workers will be the primary task spawners while I have the option of scaling to a supervisor that automatically deploys more dedicated workers via the pythonsubprocess module. I chose not to use redis for now, due to the low scale of my program overall resulting in overengineering and additional work that is simply unnecessary at the moment, however it is a potential implementation for the future. Subprocesses utilise much more resources due to spawning a brand new interpreter - imports and database connections per subprocesses - while a single worker could spawn a database connection and pass it amongst its jobs.
 
 ---
 # Example Output
