@@ -2,6 +2,7 @@ from core.configuration import create_config
 from core.engine import Engine
 from persistence.db.connection import get_connection
 from persistence.writers.db_update_scan_status import scan_pending, scan_completed, scan_failed
+from persistence.readers.check_job_queue import check_job_queue
 import asyncio
 
 async def spawn_worker(scan_id, domain, sem):
@@ -28,18 +29,7 @@ async def spawn_worker(scan_id, domain, sem):
 async def get_job():
     connection = get_connection()
 
-    cursor = connection.cursor()
-
-    query = """
-    SELECT * FROM scans
-    WHERE status = 'QUEUED'
-    ORDER BY scan_id ASC
-    LIMIT 1;
-    """
-
-    cursor.execute(query)
-
-    result = cursor.fetchone()
+    result = check_job_queue(connection)
 
     if result:
         scan_id, domain = result[0], result[1]
@@ -73,4 +63,9 @@ async def manage_workers():
         task.add_done_callback(tasks.discard)
         found_job = False
 
-asyncio.run(manage_workers())
+try:
+    print("STARTING WORKERS")
+    asyncio.run(manage_workers())
+except Exception as e:
+    print("ERROR: ", end="")
+    print(e)

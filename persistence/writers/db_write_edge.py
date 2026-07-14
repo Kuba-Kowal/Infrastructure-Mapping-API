@@ -9,8 +9,8 @@ def write_edges(graph: Graph, connection) -> list[int]:
         cursor = connection.cursor()
 
         query = ("""
-        INSERT INTO relationships(source_hash, target_hash, relationship_type)
-        VALUES(%s, %s, %s)
+        INSERT INTO relationships(source_hash, target_hash, relationship_type, observed_at)
+        VALUES(%s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
             relationship_id = LAST_INSERT_ID(relationship_id)
         """)
@@ -18,8 +18,8 @@ def write_edges(graph: Graph, connection) -> list[int]:
         relationship_ids = []
 
         # Itterate through our values
-        for source, target, relationship_type in edges:
-            cursor.execute(query, (source, target, relationship_type))
+        for source, target, relationship_type, observed_at in edges:
+            cursor.execute(query, (source, target, relationship_type, observed_at))
 
             relationship_ids.append(cursor.lastrowid) 
 

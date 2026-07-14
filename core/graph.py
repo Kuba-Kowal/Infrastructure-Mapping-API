@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field, asdict
 from core.models import *
 from core.generate_hash import generate_hash
-import tldextract
 
 @dataclass(slots=True)
 class Graph:
@@ -31,11 +30,6 @@ class Graph:
         "Organisation": "organisations",
         "DNSRecord": "dns_records"
     }
-
-    def extract_apex(self, domain) -> str:
-        result = tldextract.extract(domain)
-
-        return f"{result.domain}.{result.suffix}"
 
     def get_domains(self) -> list[str]:
         return [fqdn.data for fqdn in self.fqdns.values()]

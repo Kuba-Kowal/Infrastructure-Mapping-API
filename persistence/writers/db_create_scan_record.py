@@ -1,19 +1,20 @@
 from persistence.db.connection import get_connection
+from core.extract_apex import extract_apex
 
-def create_scan_record(apex_domain):
+def create_scan_record(query_domain):
+    apex_domain = extract_apex(query_domain)
+
     connection = get_connection()
 
     cursor = connection.cursor()
 
     # INSERT SCAN INTO THE DATABASE
     scans_query = """
-    INSERT IGNORE INTO scans (apex_domain, status)
-    VALUES (%s, %s)
+    INSERT IGNORE INTO scans (apex_domain, status, query_domain)
+    VALUES (%s, %s, %s)
     """
 
-    print(f"creating {apex_domain}")
-
-    cursor.execute(scans_query, (apex_domain, "QUEUED"))
+    cursor.execute(scans_query, (apex_domain, "QUEUED", query_domain))
 
     connection.commit()
 

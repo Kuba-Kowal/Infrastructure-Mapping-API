@@ -9,6 +9,6 @@ def map_edges(graph: Graph) -> tuple[str, str, str]:
 
     for bucket in edge_mappings:
         for obj in graph.__getattribute__(bucket):
-            edges.append((obj.source_data, obj.target_data, obj.observed_at))
+            edges.append((obj.source_data, obj.target_data, bucket, obj.observed_at))
 
     return edges
