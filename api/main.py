@@ -1,11 +1,24 @@
-from fastapi import FastAPI
-from fastapi import HTTPException
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from core.extract_apex import extract_apex
 from persistence.writers.db_create_scan_record import create_scan_record
 from persistence.readers.check_last_scan import check_last_scan
 from persistence.readers.read_full_graph import read_full_graph
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "null",
+        "http://localhost:8080",
+        "http://192.168.0.52:8080"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
+
 def unprocessable_exception():
     raise HTTPException(
         status_code=422,
