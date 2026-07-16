@@ -96,27 +96,8 @@ sqlite despite its portability as I wanted a more robust solution that is scalab
 > I chose to opt for a bit of a hybrid model, dedicated workers will be the primary task spawners while I have the option of scaling to a supervisor that automatically deploys more dedicated workers via the pythonsubprocess module. I chose not to use redis for now, due to the low scale of my program overall resulting in overengineering and additional work that is simply unnecessary at the moment, however it is a potential implementation for the future. Subprocesses utilise much more resources due to spawning a brand new interpreter - imports and database connections per subprocesses - while a single worker could spawn a database connection and pass it amongst its jobs.
 
 ---
-# Example Output
-
-```
-[⋆] QUERY VIRUSTOTAL | hackerone.com
-[+] SUCCESS VIRUSTOTAL | hackerone.com
-
-[⋆] QUERY CERT SPOTTER | mta-sts.managed.hackerone.com
-[+] SUCCESS CERTSPOTTER | mta-sts.managed.hackerone.com
-
-[⋆] QUERY DNS - A | support.hackerone.com
-
-[⋆] QUERY ASN ORIGIN | 13.226.22.7
-
-[⋆] QUERY ASN ORGANISATION | 54113
-
-Total runtime: 155.85 seconds
-
-Total Database Write Time: 0.12 seconds
-
--> ./hackerone.json
-```
+# Program Demonstration
+![Image of Program Running](Images/Demonstration.png)
 
 # Dependencies
 
